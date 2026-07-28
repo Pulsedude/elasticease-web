@@ -1,0 +1,12 @@
+[project]
+name = "elasticease-web"
+version = "0.1.0"
+description = "A Web UI version of Elasticease project. To make elasticsearch much easier to use."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.140.5",
+    "pyyaml>=6.0.3",
+    "requests>=2.34.2",
+    "rich>=15.0.0",
+]
