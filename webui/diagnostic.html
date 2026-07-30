@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>elasticease Diagnostic</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: #000;
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            width: 100%;
+        }
+        
+        h1 {
+            background: linear-gradient(135deg, #6366f1, #a855f7, #ec4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-size: 48px;
+            margin-bottom: 30px;
+        }
+        
+        .test-card {
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid rgba(42, 42, 58, 0.9);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .test-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #6366f1;
+        }
+        
+        .test-result {
+            font-size: 14px;
+            color: #94a3b8;
+            line-height: 1.6;
+        }
+        
+        .status-good {
+            color: #10b981;
+        }
+        
+        .status-bad {
+            color: #ef4444;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #6366f1, #a855f7);
+            border: none;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 10px 10px 10px 0;
+        }
+        
+        button:hover {
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>elasticease Diagnostic</h1>
+        
+        <div class="test-card">
+            <div class="test-title">Viewport Size</div>
+            <div class="test-result" id="viewport"></div>
+        </div>
+        
+        <div class="test-card">
+            <div class="test-title">Browser Info</div>
+            <div class="test-result" id="browser"></div>
+        </div>
+        
+        <div class="test-card">
+            <div class="test-title">CSS Support</div>
+            <div class="test-result" id="css-support"></div>
+        </div>
+        
+        <div class="test-card">
+            <div class="test-title">Network Status</div>
+            <div class="test-result" id="network"></div>
+        </div>
+        
+        <button onclick="runTests()">Run All Tests</button>
+        <button onclick="window.location.href='/'">Go to Main App</button>
+        <button onclick="clearAllCache()">Clear Cache & Reload</button>
+    </div>
+
+    <script>
+        function runTests() {
+            // Viewport test
+            document.getElementById('viewport').innerHTML = `
+                <span class="status-good">✓</span> Width: ${window.innerWidth}px, Height: ${window.innerHeight}px<br>
+                Device Pixel Ratio: ${window.devicePixelRatio}<br>
+                Screen: ${screen.width}x${screen.height}
+            `;
+            
+            // Browser test
+            document.getElementById('browser').innerHTML = `
+                <span class="status-good">✓</span> ${navigator.userAgent}<br>
+                Online: ${navigator.onLine ? 'Yes' : 'No'}<br>
+                Language: ${navigator.language}
+            `;
+            
+            // CSS Support test
+            const supportsBackdropFilter = CSS.supports('backdrop-filter', 'blur(10px)');
+            const supportsGradient = CSS.supports('background', 'linear-gradient(red, blue)');
+            const supportsFlexbox = CSS.supports('display', 'flex');
+            
+            document.getElementById('css-support').innerHTML = `
+                ${supportsFlexbox ? '<span class="status-good">✓</span>' : '<span class="status-bad">✗</span>'} Flexbox<br>
+                ${supportsGradient ? '<span class="status-good">✓</span>' : '<span class="status-bad">✗</span>'} CSS Gradients<br>
+                ${supportsBackdropFilter ? '<span class="status-good">✓</span>' : '<span class="status-bad">✗</span>'} Backdrop Filter
+            `;
+            
+            // Network test
+            fetch('http://127.0.0.1:5173/')
+                .then(response => {
+                    document.getElementById('network').innerHTML = `
+                        <span class="status-good">✓</span> Dev server is reachable<br>
+                        Status: ${response.status} ${response.statusText}
+                    `;
+                })
+                .catch(error => {
+                    document.getElementById('network').innerHTML = `
+                        <span class="status-bad">✗</span> Cannot reach dev server<br>
+                        Error: ${error.message}
+                    `;
+                });
+        }
+        
+        function clearAllCache() {
+            // Clear localStorage
+            localStorage.clear();
+            // Clear sessionStorage
+            sessionStorage.clear();
+            // Reload with cache bypass
+            window.location.reload(true);
+        }
+        
+        // Run tests on load
+        runTests();
+        
+        // Update viewport on resize
+        window.addEventListener('resize', () => {
+            document.getElementById('viewport').innerHTML = `
+                <span class="status-good">✓</span> Width: ${window.innerWidth}px, Height: ${window.innerHeight}px<br>
+                Device Pixel Ratio: ${window.devicePixelRatio}<br>
+                Screen: ${screen.width}x${screen.height}
+            `;
+        });
+    </script>
+</body>
+</html>

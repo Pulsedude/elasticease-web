@@ -61,7 +61,7 @@ Starting [bold]Elasticease web[/bold]...
     )
     
     time.sleep(5)
-    webbrowser.open(f"http://{frontend_sev_host}:{frontend_sev_port}")
+    webbrowser.open(f"http://{frontend_sev_host}:{frontend_sev_port}/login")
 
     frontend.wait()
     backend.wait()

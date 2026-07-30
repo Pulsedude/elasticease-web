@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   XIcon,
   HomeIcon,
@@ -9,16 +10,15 @@ import {
   ServerIcon,
 } from './Icons';
 
-export default function SidebarDrawer({ isOpen, onClose, activeTab, setActiveTab, theme }) {
+export default function SidebarDrawer({ isOpen, onClose, activeTab, theme }) {
   const isDark = theme === 'dark';
+  const navigate = useNavigate();
 
-  // Lock scroll on mobile when drawer open
   useEffect(() => {
     document.body.style.overflow = isOpen ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
   }, [isOpen]);
 
-  // ESC key closes drawer
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', handler);
@@ -26,158 +26,98 @@ export default function SidebarDrawer({ isOpen, onClose, activeTab, setActiveTab
   }, [onClose]);
 
   const navItems = [
-    { id: 'home',     label: 'Home',                   icon: HomeIcon,     badge: 'Main',        desc: 'Dashboard overview' },
-    { id: 'console',  label: 'Console App',             icon: TerminalIcon, badge: 'Interactive', desc: 'CLI terminal & cluster control' },
-    { id: 'cluster',  label: 'Cluster Diagnostics',     icon: ActivityIcon, badge: 'Live',        desc: 'Nodes, shards & indices' },
-    { id: 'settings', label: 'Backend & Connection',    icon: SettingsIcon, badge: 'API',         desc: 'Configure endpoint & API' },
+    { id: 'home',     path: '/home',          label: 'Home',                   icon: HomeIcon,     badge: 'Main',        desc: 'Dashboard overview' },
+    { id: 'console',  path: '/console',   label: 'Console App',            icon: TerminalIcon, badge: 'Interactive', desc: 'CLI terminal & cluster control' },
+    { id: 'cluster',  path: '/cluster',   label: 'Cluster Diagnostics',    icon: ActivityIcon, badge: 'Live',        desc: 'Nodes, shards & indices' },
+    { id: 'settings', path: '/settings',  label: 'Backend & Connection',   icon: SettingsIcon, badge: 'API',         desc: 'Configure endpoint & API' },
   ];
 
-  const drawerBg   = isDark ? '#0a0e1e' : '#fff';
-  const borderCol  = isDark ? '#1e293b' : '#e2e8f0';
-  const textPri    = isDark ? '#f1f5f9' : '#0f172a';
-  const textMuted  = isDark ? '#64748b' : '#94a3b8';
-  const hoverBg    = isDark ? 'rgba(30,41,59,0.7)' : '#f8fafc';
-  const activeBg   = isDark ? 'rgba(99,102,241,0.15)' : '#eef2ff';
-  const activeBdr  = isDark ? 'rgba(99,102,241,0.35)' : '#c7d2fe';
-  const activeText = isDark ? '#a5b4fc' : '#4f46e5';
-
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 50, pointerEvents: isOpen ? 'auto' : 'none' }}>
+    <div className={`drawer-root ${isOpen ? 'drawer-open' : 'drawer-closed'} fixed inset-0 z-50 ${isOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}>
       {/* Backdrop */}
       <div
         onClick={onClose}
-        style={{
-          position: 'absolute', inset: 0,
-          background: 'rgba(0,0,0,0.5)',
-          backdropFilter: 'blur(4px)',
-          opacity: isOpen ? 1 : 0,
-          transition: 'opacity 0.3s ease',
-          pointerEvents: isOpen ? 'auto' : 'none',
-        }}
+        className={`drawer-backdrop absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
       />
 
       {/* Panel */}
       <div
-        className="drawer-panel"
-        style={{
-          position: 'absolute', top: 0, left: 0, bottom: 0,
-          width: '100%', maxWidth: 300,
-          background: drawerBg,
-          borderRight: `1px solid ${borderCol}`,
-          boxShadow: '4px 0 40px rgba(0,0,0,0.3)',
-          display: 'flex', flexDirection: 'column',
-          transform: isOpen ? 'translateX(0)' : 'translateX(-100%)',
-          zIndex: 10,
-        }}
+        className={`drawer-panel absolute top-0 left-0 bottom-0 w-full max-w-[300px] flex flex-col z-10 border-r shadow-[4px_0_40px_rgba(0,0,0,0.3)] transition-transform duration-300 ${isDark ? 'bg-[#0a0e1e] border-[#1e293b]' : 'bg-white border-[#e2e8f0]'} ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         {/* Header */}
-        <div style={{ padding: '20px 20px 16px', borderBottom: `1px solid ${borderCol}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{
-              width: 34, height: 34, borderRadius: 10,
-              background: 'linear-gradient(135deg, #6366f1, #a855f7)',
-              padding: 2, flexShrink: 0,
-            }}>
-              <div style={{
-                width: '100%', height: '100%',
-                background: isDark ? '#070b14' : '#fff',
-                borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <ShieldIcon className="w-4 h-4" style={{ color: '#818cf8' }} />
+        <div className={`drawer-header px-5 pt-5 pb-4 border-b flex items-center justify-between ${isDark ? 'border-[#1e293b]' : 'border-[#e2e8f0]'}`}>
+          <div className="drawer-brand flex items-center gap-2.5">
+            <div
+              className="w-[34px] h-[34px] rounded-[10px] p-0.5 flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg, #6366f1, #a855f7)' }}
+            >
+              <div className={`w-full h-full rounded-lg flex items-center justify-center ${isDark ? 'bg-[#070b14]' : 'bg-white'}`}>
+                <ShieldIcon className="w-4 h-4 text-indigo-400" />
               </div>
             </div>
             <div>
-              <p className="gradient-text" style={{ fontWeight: 800, fontSize: 16, lineHeight: 1 }}>Élasticease</p>
-              <p style={{ fontSize: 11, color: textMuted, marginTop: 2 }}>Navigation</p>
+              <p className="gradient-text font-extrabold text-base leading-none">Élasticease</p>
+              <p className={`text-[11px] mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Navigation</p>
             </div>
           </div>
           <button
             onClick={onClose} type="button"
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              padding: 8, borderRadius: 10,
-              color: textMuted,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'background 0.2s, color 0.2s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = hoverBg; e.currentTarget.style.color = textPri; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = textMuted; }}
+            className={`p-2 rounded-[10px] flex items-center justify-center transition-all cursor-pointer border-none bg-transparent ${isDark ? 'text-slate-500 hover:bg-slate-800/70 hover:text-slate-100' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-900'}`}
           >
             <XIcon className="w-5 h-5" />
           </button>
         </div>
 
         {/* Nav items */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
-          <p style={{ padding: '4px 12px 8px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: textMuted }}>
-            Main Menu
-          </p>
+        <div className="drawer-nav flex-1 overflow-y-auto p-3">
+          <p className={`drawer-menu-label px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Main Menu</p>
           {navItems.map(item => {
             const Icon = item.icon;
             const active = activeTab === item.id;
             return (
               <button
                 key={item.id}
-                onClick={() => { setActiveTab(item.id); onClose(); }}
+                onClick={() => { navigate(item.path); onClose(); }}
                 type="button"
-                style={{
-                  width: '100%', display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '12px 12px', borderRadius: 14, marginBottom: 4,
-                  background: active ? activeBg : 'none',
-                  border: active ? `1px solid ${activeBdr}` : '1px solid transparent',
-                  cursor: 'pointer', textAlign: 'left',
-                  transition: 'background 0.18s, border 0.18s',
-                }}
-                onMouseEnter={e => { if (!active) e.currentTarget.style.background = hoverBg; }}
-                onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'none'; }}
+                className={`drawer-nav-item w-full flex items-center gap-3 px-3 py-3 rounded-[14px] mb-1 cursor-pointer text-left transition-all border ${
+                  active
+                    ? isDark ? 'bg-indigo-500/15 border-indigo-500/35' : 'bg-indigo-50 border-indigo-200'
+                    : isDark ? 'border-transparent hover:bg-slate-800/70 bg-transparent' : 'border-transparent hover:bg-slate-50 bg-transparent'
+                }`}
               >
-                {/* Icon */}
-                <div style={{
-                  width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: active ? '#6366f1' : (isDark ? '#1e293b' : '#f1f5f9'),
-                  boxShadow: active ? '0 4px 12px rgba(99,102,241,0.35)' : 'none',
-                }}>
-                  <Icon className="w-4 h-4" style={{ color: active ? '#fff' : textMuted }} />
+                <div className={`drawer-nav-icon w-9 h-9 rounded-[10px] flex-shrink-0 flex items-center justify-center ${
+                  active ? 'bg-indigo-600 shadow-[0_4px_12px_rgba(99,102,241,0.35)]' : isDark ? 'bg-slate-800' : 'bg-slate-100'
+                }`}>
+                  <Icon className={`w-4 h-4 ${active ? 'text-white' : isDark ? 'text-slate-500' : 'text-slate-400'}`} />
                 </div>
-
-                {/* Text */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: active ? activeText : textPri, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {item.label}
-                    </span>
-                    <span style={{
-                      fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 999, whiteSpace: 'nowrap',
-                      background: active ? '#6366f1' : (isDark ? '#1e293b' : '#f1f5f9'),
-                      color: active ? '#fff' : textMuted,
-                    }}>
-                      {item.badge}
-                    </span>
+                <div className="drawer-nav-copy flex-1 min-w-0">
+                  <div className="drawer-nav-title-row flex items-center justify-between gap-1.5">
+                    <span className={`text-[13px] font-bold truncate ${
+                      active ? isDark ? 'text-indigo-300' : 'text-indigo-700' : isDark ? 'text-slate-100' : 'text-slate-900'
+                    }`}>{item.label}</span>
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap ${
+                      active ? 'bg-indigo-600 text-white' : isDark ? 'bg-slate-800 text-slate-500' : 'bg-slate-100 text-slate-400'
+                    }`}>{item.badge}</span>
                   </div>
-                  <p style={{ fontSize: 11, color: textMuted, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {item.desc}
-                  </p>
+                  <p className={`text-[11px] mt-0.5 truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{item.desc}</p>
                 </div>
               </button>
             );
           })}
         </div>
 
-        {/* Footer status */}
-        <div style={{ padding: 16, borderTop: `1px solid ${borderCol}` }}>
-          <div style={{
-            padding: '12px 14px', borderRadius: 14,
-            background: isDark ? 'rgba(15,23,42,0.8)' : '#f8fafc',
-            border: `1px solid ${borderCol}`,
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: textPri, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <ServerIcon className="w-3.5 h-3.5" style={{ color: '#10b981' }} /> Backend Status
+        {/* Footer */}
+        <div className={`drawer-footer p-4 border-t ${isDark ? 'border-[#1e293b]' : 'border-[#e2e8f0]'}`}>
+          <div className={`drawer-status-card px-3.5 py-3 rounded-[14px] border ${
+            isDark ? 'bg-slate-900/80 border-[#1e293b]' : 'bg-slate-50 border-[#e2e8f0]'
+          }`}>
+            <div className="drawer-status-row flex items-center justify-between mb-1">
+              <span className={`text-xs font-bold flex items-center gap-1.5 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+                <ServerIcon className="w-3.5 h-3.5 text-emerald-500" /> Backend Status
               </span>
-              <span className="animate-pulse" style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+              <span className="animate-pulse w-2 h-2 rounded-full bg-emerald-500 inline-block" />
             </div>
-            <p style={{ fontSize: 11, color: textMuted }}>Ready for Python backend API</p>
+            <p className={`text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Ready for Python backend API</p>
           </div>
         </div>
       </div>
