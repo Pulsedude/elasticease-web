@@ -1,12 +1,16 @@
 from config import read, write
 import requests
+import urllib3
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 class CoreOps:
     def __init__(self):
         config_read = read()
-        self.configuration = config_read if not isinstance(
-            config_read, tuple) else None
+
+        self.configuration = None if isinstance(
+            config_read, tuple) else config_read
 
         self.elastic_username = self.configuration.get("elasticease_web").get(
             "elasticsearch").get("username") if self.configuration else None
@@ -28,31 +32,37 @@ class CoreOps:
         try:
             response = requests.get(
                 self.elastic_base_url +
-                path if not self.elastic_base_url.endswith(
+                path if self.elastic_base_url.endswith(
                     "/") else self.elastic_base_url + "/" + path,
                 timeout=10,
                 auth=self.auth,
                 verify=self.verify_certs
             )
 
-            if response.status_code != 200:
-                return False
-            
-            return response
-        except Exception as e:
-            return (False, e)
-            
+            if response.status_code == 401:
+                return {"status": "alive", "response": "failed to authorized!"}
 
-    def auth(self):
+            return {"status": "alive", "response": response.json()}
+        except Exception as e:
+            return (False, str(e))
+
+    def authenticate(self, username: str, password: str):
         """Check authorization By making request to base url of elasticsearch
         """
         try:
-            request = self.make_request()
-            
-            if not request or isinstance(request, tuple):
-                return False
-            
-            return True
+            response = response = requests.get(
+                self.elastic_base_url,
+                timeout=10,
+                auth=(username, password),
+                verify=self.verify_certs
+            )
+
+            if response.status_code == 401:
+                return {"status": "alive", "response": "failed to authorized!"}
+
+            return {"status": "alive", "response": response.json()}
         except Exception as e:
-            return (False, e)
-            
+            return (False, str(e))
+
+# obj = CoreOps()
+# print(obj.authenticate())
