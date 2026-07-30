@@ -1,14 +1,9 @@
 import React from 'react';
-import { TerminalIcon, CheckIcon, LayersIcon, CpuIcon } from './Icons';
+import { TerminalIcon, CheckIcon } from './Icons';
 import ConsoleTerminal from './ConsoleTerminal';
 
 export default function ConsoleAppPage({ theme }) {
   const isDark = theme === 'dark';
-  const textPri = isDark ? '#f1f5f9' : '#0f172a';
-  const textSec = isDark ? '#94a3b8' : '#475569';
-  const cardBg  = isDark ? '#0f1629' : '#fff';
-  const cardBdr = isDark ? '#1e293b' : '#e2e8f0';
-  const shadow  = isDark ? '0 2px 12px rgba(0,0,0,0.3)' : '0 2px 12px rgba(0,0,0,0.06)';
 
   const features = [
     { title: 'Syntax Highlighting',   icon: CheckIcon, desc: 'Formatted JSON outputs with auto-indent and clean color coding.' },
@@ -17,33 +12,34 @@ export default function ConsoleAppPage({ theme }) {
   ];
 
   return (
-    <div>
-      {/* Page header */}
-      <div style={{ borderBottom: `1px solid ${cardBdr}`, paddingBottom: 20, marginBottom: 28 }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 11, fontWeight: 700, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8, padding: '5px 12px', borderRadius: 999, background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)' }}>
+    <div className="page-stack">
+      <div className={`section-heading border-b pb-5 mb-7 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+        <div className="inline-flex items-center gap-1.5 text-[11px] font-bold text-indigo-500 uppercase tracking-[0.08em] mb-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/25">
           <TerminalIcon className="w-3.5 h-3.5" /> Interactive CLI Environment
         </div>
-        <h1 style={{ fontSize: 'clamp(22px, 4vw, 32px)', fontWeight: 800, color: textPri, letterSpacing: '-0.5px', marginBottom: 8 }}>
+        <h1 className={`text-2xl md:text-3xl font-extrabold tracking-tight mb-2 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
           Élasticease Console App
         </h1>
-        <p style={{ fontSize: 14, color: textSec, lineHeight: 1.65 }}>
+        <p className={`text-sm leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
           Full command-line power in your browser. Execute REST commands, inspect mappings, and check node telemetry in real-time.
         </p>
       </div>
 
-      {/* Terminal */}
       <ConsoleTerminal theme={theme} />
 
-      {/* Feature cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginTop: 24 }}>
+      <div className="feature-grid feature-grid-3 grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
         {features.map((f, i) => {
           const Icon = f.icon;
           return (
-            <div key={i} style={{ background: cardBg, border: `1px solid ${cardBdr}`, borderRadius: 18, padding: '20px', boxShadow: shadow }}>
-              <h3 style={{ fontSize: 13, fontWeight: 700, color: textPri, display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <Icon className="w-4 h-4" style={{ color: '#10b981' }} /> {f.title}
+            <div key={i} className={`feature-card rounded-[18px] p-5 border ${
+              isDark
+                ? 'bg-[#0d0d0d] border-slate-800 shadow-[0_2px_12px_rgba(0,0,0,0.3)]'
+                : 'bg-white border-slate-200 shadow-sm'
+            }`}>
+              <h3 className={`text-[13px] font-bold flex items-center gap-2 mb-2 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+                <Icon className="w-4 h-4 text-emerald-500" /> {f.title}
               </h3>
-              <p style={{ fontSize: 12, color: textSec, lineHeight: 1.65 }}>{f.desc}</p>
+              <p className={`text-xs leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{f.desc}</p>
             </div>
           );
         })}

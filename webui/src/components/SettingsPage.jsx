@@ -1,32 +1,11 @@
 import React, { useState } from 'react';
-import { SettingsIcon, ServerIcon, CheckIcon } from './Icons';
+import { SettingsIcon, CheckIcon } from './Icons';
 
 export default function SettingsPage({ theme }) {
   const isDark = theme === 'dark';
-  const textPri  = isDark ? '#f1f5f9' : '#0f172a';
-  const textSec  = isDark ? '#94a3b8' : '#475569';
-  const textMuted= isDark ? '#64748b' : '#94a3b8';
-  const cardBg   = isDark ? '#0f1629' : '#fff';
-  const cardBdr  = isDark ? '#1e293b' : '#e2e8f0';
-  const inputBg  = isDark ? '#070b14' : '#f8fafc';
-  const shadow   = isDark ? '0 2px 12px rgba(0,0,0,0.3)' : '0 2px 12px rgba(0,0,0,0.06)';
-
   const [backendUrl, setBackendUrl] = useState('http://localhost:8000/api');
   const [esHost, setEsHost] = useState('http://localhost:9200');
   const [saved, setSaved] = useState(false);
-
-  const inputStyle = {
-    width: '100%', padding: '12px 16px',
-    background: inputBg, border: `1px solid ${cardBdr}`,
-    borderRadius: 12, color: textPri,
-    fontFamily: 'monospace', fontSize: 13, outline: 'none',
-    transition: 'border 0.2s',
-  };
-
-  const labelStyle = {
-    display: 'block', fontSize: 11, fontWeight: 700,
-    color: textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8,
-  };
 
   const handleSave = (e) => {
     e.preventDefault();
@@ -34,73 +13,70 @@ export default function SettingsPage({ theme }) {
     setTimeout(() => setSaved(false), 3000);
   };
 
+  const inputClass = `w-full px-4 py-3 font-mono text-[13px] rounded-xl outline-none transition-colors border ${
+    isDark
+      ? 'bg-black text-slate-100 border-slate-800 focus:border-indigo-500'
+      : 'bg-slate-50 text-slate-900 border-slate-200 focus:border-indigo-500'
+  }`;
+
+  const labelClass = `block text-[11px] font-bold uppercase tracking-[0.08em] mb-2 ${
+    isDark ? 'text-slate-500' : 'text-slate-400'
+  }`;
+
   return (
-    <div style={{ maxWidth: 680 }}>
-      {/* Header */}
-      <div style={{ borderBottom: `1px solid ${cardBdr}`, paddingBottom: 20, marginBottom: 28 }}>
-        <h1 style={{ fontSize: 'clamp(22px, 4vw, 30px)', fontWeight: 800, color: textPri, letterSpacing: '-0.4px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
-          <SettingsIcon className="w-7 h-7" style={{ color: '#6366f1' }} /> Backend Connection Settings
+    <div className="settings-page max-w-[680px]">
+      <div className={`section-heading border-b pb-5 mb-7 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+        <h1 className={`text-2xl md:text-[30px] font-extrabold tracking-tight flex items-center gap-2.5 flex-wrap mb-1.5 ${
+          isDark ? 'text-slate-100' : 'text-slate-900'
+        }`}>
+          <SettingsIcon className="w-7 h-7 text-indigo-500" /> Backend Connection Settings
         </h1>
-        <p style={{ fontSize: 14, color: textSec, lineHeight: 1.65 }}>
-          Configure how the frontend communicates with your Python backend (<code style={{ fontSize: 12, background: isDark ? '#1e293b' : '#f1f5f9', padding: '1px 6px', borderRadius: 4, color: '#818cf8' }}>run.py</code> & API runner).
+        <p className={`text-sm leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+          Configure how the frontend communicates with your Python backend (<code className={`text-xs px-1.5 py-0.5 rounded text-indigo-400 ${
+            isDark ? 'bg-slate-800' : 'bg-slate-100'
+          }`}>run.py</code> &amp; API runner).
         </p>
       </div>
 
-      {/* Success banner */}
       {saved && (
-        <div style={{
-          marginBottom: 20, padding: '14px 18px', borderRadius: 14,
-          background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)',
-          color: '#34d399', fontSize: 13, fontWeight: 600,
-          display: 'flex', alignItems: 'center', gap: 8,
-        }}>
-          <CheckIcon className="w-4 h-4" style={{ color: '#10b981', flexShrink: 0 }} />
+        <div className="mb-5 px-4 py-3.5 rounded-[14px] bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[13px] font-semibold flex items-center gap-2">
+          <CheckIcon className="w-4 h-4 text-emerald-500 flex-shrink-0" />
           Settings saved! Ready for backend API integration.
         </div>
       )}
 
-      {/* Form card */}
-      <div style={{ background: cardBg, border: `1px solid ${cardBdr}`, borderRadius: 20, padding: 'clamp(22px, 4vw, 36px)', boxShadow: shadow }}>
-        <form onSubmit={handleSave}>
-          {/* Backend URL */}
-          <div style={{ marginBottom: 22 }}>
-            <label style={labelStyle}>Python Backend API Base Endpoint</label>
+      <div className={`settings-card rounded-[20px] border ${
+        isDark
+          ? 'bg-[#0d0d0d] border-slate-800 shadow-[0_2px_12px_rgba(0,0,0,0.3)]'
+          : 'bg-white border-slate-200 shadow-sm'
+      } p-6 md:p-9`}>
+        <form className="settings-form" onSubmit={handleSave}>
+          <div className="settings-field mb-5">
+            <label className={labelClass}>Python Backend API Base Endpoint</label>
             <input
               type="text" value={backendUrl} onChange={e => setBackendUrl(e.target.value)}
-              style={inputStyle} required
-              onFocus={e => e.currentTarget.style.border = '1px solid #6366f1'}
-              onBlur={e => e.currentTarget.style.border = `1px solid ${cardBdr}`}
+              className={inputClass} required
             />
-            <p style={{ fontSize: 11, color: textMuted, marginTop: 6 }}>
-              Points to your Python server configured in <code style={{ fontSize: 11, background: isDark ? '#1e293b' : '#f1f5f9', padding: '1px 5px', borderRadius: 4, color: '#818cf8' }}>config.yaml</code>.
+            <p className={`text-[11px] mt-1.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+              Points to your Python server configured in <code className={`text-[11px] px-1 py-0.5 rounded-sm text-indigo-400 ${
+                isDark ? 'bg-slate-800' : 'bg-slate-100'
+              }`}>config.yaml</code>.
             </p>
           </div>
-
-          {/* ES Host */}
-          <div style={{ marginBottom: 28 }}>
-            <label style={labelStyle}>Elasticsearch Node URL</label>
+          <div className="settings-field mb-7">
+            <label className={labelClass}>Elasticsearch Node URL</label>
             <input
               type="text" value={esHost} onChange={e => setEsHost(e.target.value)}
-              style={inputStyle} required
-              onFocus={e => e.currentTarget.style.border = '1px solid #6366f1'}
-              onBlur={e => e.currentTarget.style.border = `1px solid ${cardBdr}`}
+              className={inputClass} required
             />
-            <p style={{ fontSize: 11, color: textMuted, marginTop: 6 }}>
+            <p className={`text-[11px] mt-1.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
               Direct Elasticsearch REST API endpoint for the Console App.
             </p>
           </div>
-
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <div className="settings-actions flex justify-end">
             <button type="submit"
-              style={{
-                padding: '12px 28px', borderRadius: 12, border: 'none',
-                background: 'linear-gradient(135deg, #6366f1, #a855f7)',
-                color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer',
-                boxShadow: '0 6px 20px rgba(99,102,241,0.3)',
-                transition: 'transform 0.15s, box-shadow 0.15s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 10px 24px rgba(99,102,241,0.45)'; }}
-              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(99,102,241,0.3)'; }}
+              className="px-7 py-3 rounded-xl text-white font-bold text-[13px] cursor-pointer transition-all hover:-translate-y-0.5 border-none"
+              style={{ background: 'linear-gradient(135deg, #6366f1, #a855f7)', boxShadow: '0 6px 20px rgba(99,102,241,0.3)' }}
             >
               Save Connection Settings
             </button>

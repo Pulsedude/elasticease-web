@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
 import { TerminalIcon, PlayIcon, SparklesIcon } from './Icons';
 
-export default function ConsoleTerminal({ theme }) {
-  const isDark = theme === 'dark';
-
+export default function ConsoleTerminal() {
   const [inputVal, setInputVal] = useState('GET /_cluster/health');
   const [history, setHistory] = useState([
     {
@@ -48,69 +46,50 @@ export default function ConsoleTerminal({ theme }) {
     if (!cmd) setInputVal('');
   };
 
-  const bg      = '#0b0f1a';
-  const bgHeader = '#111827';
-  const border   = '#1f2937';
-  const textGray = '#6b7280';
-  const textGreen = '#10b981';
-  const textIndigo = '#818cf8';
-  const textWhite = '#f3f4f6';
-
   return (
-    <div style={{ borderRadius: 20, overflow: 'hidden', border: `1px solid ${border}`, background: bg, boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}>
+    <div className="terminal-panel rounded-[20px] overflow-hidden border border-[#1f2937] bg-[#0b0f1a] shadow-[0_20px_60px_rgba(0,0,0,0.5)]">
       {/* Window chrome */}
-      <div style={{ padding: '14px 20px', background: bgHeader, borderBottom: `1px solid ${border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ display: 'flex', gap: 6 }}>
-            {['#f87171', '#fbbf24', '#34d399'].map((c, i) => <span key={i} style={{ width: 12, height: 12, borderRadius: '50%', background: c, display: 'inline-block' }} />)}
+      <div className="terminal-chrome px-5 py-3.5 bg-[#111827] border-b border-[#1f2937] flex items-center justify-between flex-wrap gap-2">
+        <div className="terminal-window-title flex items-center gap-3">
+          <div className="terminal-dots flex gap-1.5">
+            {['#f87171', '#fbbf24', '#34d399'].map((c, i) => (
+              <span key={i} className="w-3 h-3 rounded-full inline-block" style={{ background: c }} />
+            ))}
           </div>
-          <span style={{ fontSize: 12, color: textGray, fontFamily: 'monospace', paddingLeft: 12, borderLeft: `1px solid ${border}`, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <TerminalIcon className="w-3.5 h-3.5" style={{ color: textIndigo }} />
+          <span className="terminal-title text-xs text-gray-500 font-mono pl-3 border-l border-[#1f2937] flex items-center gap-1.5">
+            <TerminalIcon className="w-3.5 h-3.5 text-indigo-400" />
             elasticease-console ~ bash
           </span>
         </div>
-        <span style={{ fontSize: 10, fontFamily: 'monospace', color: textGreen, background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.25)', padding: '3px 10px', borderRadius: 999, display: 'flex', alignItems: 'center', gap: 5 }}>
-          <span className="animate-pulse" style={{ width: 6, height: 6, borderRadius: '50%', background: textGreen, display: 'inline-block' }} />
+        <span className="terminal-status text-[10px] font-mono text-emerald-500 bg-emerald-500/10 border border-emerald-500/25 px-2.5 py-1 rounded-full flex items-center gap-1">
+          <span className="animate-pulse w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
           Runner Active
         </span>
       </div>
 
-      {/* Preset quick buttons */}
-      <div style={{ padding: '10px 16px', background: 'rgba(17,24,39,0.6)', borderBottom: `1px solid ${border}`, display: 'flex', alignItems: 'center', gap: 8, overflowX: 'auto', flexWrap: 'nowrap' }}>
-        <span style={{ fontSize: 11, color: textGray, fontFamily: 'monospace', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4 }}>
-          <SparklesIcon className="w-3.5 h-3.5" style={{ color: '#fbbf24' }} /> Quick:
+      {/* Preset buttons */}
+      <div className="terminal-presets px-4 py-2.5 bg-[rgba(17,24,39,0.6)] border-b border-[#1f2937] flex items-center gap-2 overflow-x-auto flex-nowrap">
+        <span className="terminal-quick-label text-[11px] text-gray-500 font-mono flex-shrink-0 flex items-center gap-1">
+          <SparklesIcon className="w-3.5 h-3.5 text-yellow-400" /> Quick:
         </span>
         {presets.map((p, i) => (
           <button key={i} onClick={() => { setInputVal(p); runCommand(p); }} type="button"
-            style={{
-              padding: '5px 10px', borderRadius: 8, background: '#1f2937',
-              color: '#9ca3af', fontFamily: 'monospace', fontSize: 11,
-              border: `1px solid ${border}`, cursor: 'pointer', whiteSpace: 'nowrap',
-              transition: 'background 0.15s, color 0.15s',
-              flexShrink: 0,
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#6366f1'; e.currentTarget.style.color = '#fff'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = '#1f2937'; e.currentTarget.style.color = '#9ca3af'; }}
+            className="terminal-preset-button px-2.5 py-1 rounded-lg bg-[#1f2937] text-gray-400 font-mono text-[11px] border border-[#1f2937] cursor-pointer whitespace-nowrap flex-shrink-0 transition-all hover:bg-indigo-600 hover:text-white"
           >
             {p}
           </button>
         ))}
       </div>
 
-      {/* Output area */}
-      <div style={{ padding: '20px', maxHeight: 320, overflowY: 'auto', fontFamily: 'monospace', fontSize: 12, lineHeight: 1.7, display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Output */}
+      <div className="terminal-output p-5 max-h-80 overflow-y-auto font-mono text-xs leading-[1.7] flex flex-col gap-5">
         {history.map((item, i) => (
-          <div key={i}>
-            <div style={{ marginBottom: 8, display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-              <span style={{ color: textGreen }}>user@elasticease:~$</span>
-              <span style={{ color: textWhite, fontWeight: 700 }}>{item.cmd}</span>
+          <div className="terminal-entry" key={i}>
+            <div className="terminal-command mb-2 flex items-baseline gap-2 flex-wrap">
+              <span className="terminal-prompt text-emerald-500">user@elasticease:~$</span>
+              <span className="terminal-command-text text-gray-100 font-bold">{item.cmd}</span>
             </div>
-            <pre style={{
-              padding: '14px 16px', borderRadius: 12,
-              background: 'rgba(17,24,39,0.7)', border: `1px solid ${border}`,
-              color: '#d1d5db', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-              margin: 0, lineHeight: 1.7,
-            }}>
+            <pre className="terminal-pre px-4 py-3.5 rounded-xl bg-[rgba(17,24,39,0.7)] border border-[#1f2937] text-gray-300 overflow-x-auto whitespace-pre-wrap break-words m-0 leading-[1.7]">
               {item.out}
             </pre>
           </div>
@@ -118,29 +97,17 @@ export default function ConsoleTerminal({ theme }) {
       </div>
 
       {/* Input bar */}
-      <div style={{ padding: '12px 16px', background: bgHeader, borderTop: `1px solid ${border}`, display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span style={{ color: textGreen, fontFamily: 'monospace', fontSize: 13 }}>$</span>
+      <div className="terminal-input-row px-4 py-3 bg-[#111827] border-t border-[#1f2937] flex items-center gap-2.5">
+        <span className="terminal-input-prompt text-emerald-500 font-mono text-[13px]">$</span>
         <input
           type="text" value={inputVal} onChange={e => setInputVal(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') runCommand(); }}
           placeholder="Type an Elasticsearch API command..."
-          style={{
-            flex: 1, background: 'transparent', border: 'none',
-            color: textWhite, fontFamily: 'monospace', fontSize: 12,
-            outline: 'none', caretColor: textIndigo, minWidth: 0,
-          }}
+          className="terminal-input flex-1 bg-transparent border-none text-gray-100 font-mono text-xs outline-none caret-indigo-400 min-w-0"
         />
         <button
           onClick={() => runCommand()} type="button"
-          style={{
-            padding: '7px 14px', borderRadius: 9,
-            background: '#6366f1', color: '#fff',
-            fontFamily: 'monospace', fontSize: 11, fontWeight: 700,
-            border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
-            flexShrink: 0, transition: 'background 0.15s',
-          }}
-          onMouseEnter={e => e.currentTarget.style.background = '#4f46e5'}
-          onMouseLeave={e => e.currentTarget.style.background = '#6366f1'}
+          className="terminal-run-button px-3.5 py-1.5 rounded-[9px] bg-indigo-600 hover:bg-indigo-700 text-white font-mono text-[11px] font-bold border-none cursor-pointer flex items-center gap-1 flex-shrink-0 transition-colors"
         >
           <PlayIcon className="w-3 h-3" /> Run
         </button>
