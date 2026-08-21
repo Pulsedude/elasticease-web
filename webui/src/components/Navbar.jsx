@@ -30,25 +30,26 @@ export default function Navbar({ user, onLogout, theme, toggleTheme, onOpenDrawe
 
   return (
     <header className={`app-header sticky top-0 z-30 w-full backdrop-blur-md border-b transition-all duration-300 ${isDark ? 'bg-[rgba(10,14,30,0.92)] border-[#1e293b]' : 'bg-[rgba(248,250,252,0.92)] border-[#e2e8f0]'}`}>
-      <div className="nav-inner max-w-[1280px] mx-auto px-5 h-16 flex items-center justify-between gap-4">
+      <div className="nav-inner relative max-w-[1280px] mx-auto px-5 h-16 flex items-center justify-between gap-4">
         {/* LEFT */}
         <div className="nav-left flex items-center gap-3">
           <button onClick={onOpenDrawer} type="button" title="Open menu"
             className={`p-2 rounded-xl flex items-center justify-center transition-all cursor-pointer border ${isDark ? 'text-slate-400 bg-slate-800/50 border-slate-700/80 hover:bg-slate-700/60' : 'text-slate-600 bg-slate-100/80 border-slate-200 hover:bg-slate-200/80'}`}>
             <MenuIcon className="w-5 h-5" />
           </button>
-          <div className="brand-lockup flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-[10px] p-0.5 flex-shrink-0" style={{ background: 'linear-gradient(135deg, #6366f1, #a855f7)' }}>
-              <div className={`w-full h-full rounded-[8px] overflow-hidden flex items-center justify-center ${isDark ? 'bg-[#070b14]' : 'bg-white'}`}>
-                {!logoError ? (
-                  <img src={logo} alt="Logo" className="w-[22px] h-[22px] object-contain" onError={() => setLogoError(true)} />
-                ) : (
-                  <ShieldIcon className="w-5 h-5 text-[#818cf8]" />
-                )}
-              </div>
+        </div>
+
+        <div className="brand-lockup nav-brand-center flex items-center gap-3">
+          <div className="w-11 h-11 rounded-[13px] p-0.5 flex-shrink-0" style={{ background: 'linear-gradient(135deg, #6366f1, #a855f7)' }}>
+            <div className={`w-full h-full rounded-[10px] overflow-hidden flex items-center justify-center ${isDark ? 'bg-[#070b14]' : 'bg-white'}`}>
+              {!logoError ? (
+                <img src={logo} alt="Logo" className="brand-logo-img" onError={() => setLogoError(true)} />
+              ) : (
+                <ShieldIcon className="w-6 h-6 text-[#818cf8]" />
+              )}
             </div>
-            <span className="gradient-text text-lg font-extrabold tracking-tight leading-none">Elasticease</span>
           </div>
+          <span className="gradient-text text-xl font-extrabold tracking-tight leading-none">elasticease</span>
         </div>
 
         {/* RIGHT */}
@@ -64,13 +65,13 @@ export default function Navbar({ user, onLogout, theme, toggleTheme, onOpenDrawe
           <div ref={dropdownRef} className="profile-wrapper relative">
             <button onClick={() => setProfileOpen(v => !v)} type="button"
               className={`profile-trigger flex items-center gap-2 px-2.5 py-1.5 rounded-xl border shadow-sm cursor-pointer transition-all ${isDark ? 'bg-slate-900/90 border-slate-700 hover:bg-slate-800' : 'bg-white border-slate-200 hover:bg-slate-50'}`}>
-              <div className="w-7 h-7 rounded-lg flex-shrink-0 flex items-center justify-center text-white font-extrabold text-xs" style={{ background: 'linear-gradient(135deg, #6366f1, #a855f7)' }}>
+              <div className="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center text-white font-extrabold text-sm" style={{ background: 'linear-gradient(135deg, #6366f1, #a855f7)' }}>
                 {user?.name ? user.name.charAt(0).toUpperCase() : 'A'}
               </div>
-              <span className={`text-xs font-semibold max-w-[90px] overflow-hidden text-ellipsis whitespace-nowrap ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+              <span className={`text-sm font-semibold max-w-[100px] overflow-hidden text-ellipsis whitespace-nowrap ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                 {user?.name || 'User'}
               </span>
-              <span className="animate-pulse w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
+              <span className="animate-pulse w-2.5 h-2.5 rounded-full bg-emerald-500 flex-shrink-0" />
             </button>
 
             {profileOpen && (

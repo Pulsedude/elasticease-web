@@ -40,11 +40,14 @@ class CoreOps:
             )
 
             if response.status_code == 401:
-                return {"status": "alive", "response": "failed to authorized!"}
+                return {"success": False, "status": "alive", "response": "failed to authorized!"}
 
-            return {"status": "alive", "response": response.json()}
+            return {"success": True, "status": "alive", "response": response.json()}
         except Exception as e:
-            return (False, str(e))
+            return {
+                "success": False,
+                "error": str(e)
+            }
 
     def authenticate(self, username: str, password: str):
         """Check authorization By making request to base url of elasticsearch
@@ -58,11 +61,37 @@ class CoreOps:
             )
 
             if response.status_code == 401:
-                return {"status": "alive", "response": "failed to authorized!"}
+                return {"success": False, "status": "alive", "response": "failed to authorize"}
 
-            return {"status": "alive", "response": response.json()}
+            return {"success": True, "status": "alive", "response": response.json()}
         except Exception as e:
-            return (False, str(e))
+            return {
+                "success": False,
+                "error": str(e)
+            }
 
-# obj = CoreOps()
-# print(obj.authenticate())
+    def check_cluster_status(self):
+        """check the active cluster status (health)
+        """
+        try:
+            response = self.make_request("_cluster/health")
+            return response
+
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    def shards(self):
+        """Return the all available active shards. Cluster -> Node -> Shards
+        """
+        try:
+            response = self.make_request("_cat/shards?format=json")
+            return response
+        
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }

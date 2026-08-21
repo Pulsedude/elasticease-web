@@ -3,9 +3,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 # routers
-from routers import (
-    auth,
-)
+from routers import core_operations_routers
 
 app = FastAPI(
     title="elasticease",
@@ -35,8 +33,8 @@ app.add_middleware(
 
 # default GET route 
 @app.get("/")
-def default_response():
+def redirection_to_openapi_documentation():
     return RedirectResponse(url="/openapi")
 
 # other routes ---------------------
-app.include_router(auth.router)
+app.include_router(core_operations_routers.router)

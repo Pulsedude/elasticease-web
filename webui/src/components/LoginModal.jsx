@@ -14,7 +14,6 @@ export default function LoginModal({ onLoginSuccess }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -40,11 +39,11 @@ export default function LoginModal({ onLoginSuccess }) {
     setIsLoading(true);
 
     try {
-      console.log("Calling auth API:", `${API_BASE_URL}/auth`);
+      console.log("Calling auth API:", `${API_BASE_URL}/v1/auth`);
       console.log("Sending credentials:", { username: username.trim(), password: "***" });
       
       // Call backend auth API with POST and credentials
-      const response = await fetch(`${API_BASE_URL}/auth`, {
+      const response = await fetch(`${API_BASE_URL}/v1/auth`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -61,14 +60,14 @@ export default function LoginModal({ onLoginSuccess }) {
       const data = await response.json();
       console.log("Response data:", data);
 
-      if (response.ok && data.success === "authorized") {
+      if (response.ok && data.success === true) {
         console.log("Login SUCCESS - redirecting");
         // Success: Elasticsearch is running and credentials are correct
         onLoginSuccess({
           name: username.trim(),
           role: "Cluster Administrator",
           email: `${username.trim().toLowerCase().replace(/\s+/g, "")}@elasticease.io`,
-          metadata: data.message || {},
+          metadata: data.response || {},
         });
       } else if (response.status === 401) {
         console.log("Login FAILED - 401 Unauthorized");
@@ -87,7 +86,7 @@ export default function LoginModal({ onLoginSuccess }) {
     } catch (error) {
       console.log("Login FAILED - Network error:", error);
       // Network error or backend not running
-      setErrorMsg(`Cannot connect to backend server at ${API_BASE_URL}. Please ensure the backend is running (python run.py).`);
+      setErrorMsg(`Cannot connect to backend server at ${API_BASE_URL}. Please ensure the backend is running.`);
       console.error("Login error:", error);
     } finally {
       setIsLoading(false);
@@ -191,8 +190,8 @@ export default function LoginModal({ onLoginSuccess }) {
   };
 
   const logoContainerStyle = {
-    width: "120px",
-    height: "120px",
+    width: "132px",
+    height: "132px",
     borderRadius: "100px",
     margin: "0 auto 8px",
     padding: "2px",
@@ -210,6 +209,14 @@ export default function LoginModal({ onLoginSuccess }) {
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
+  };
+
+  const logoImageStyle = {
+    width: "100%",
+    height: "100%",
+    objectFit: "contain",
+    transform: "scale(2.25)",
+    transformOrigin: "center",
   };
 
   const titleStyle = {
@@ -329,11 +336,7 @@ export default function LoginModal({ onLoginSuccess }) {
                 <img
                   src={logo}
                   alt="Logo"
-                  style={{
-                    width: "1020%",
-                    height: "100%",
-                    objectFit: "contain",
-                  }}
+                  style={logoImageStyle}
                 />
               </div>
             </div>

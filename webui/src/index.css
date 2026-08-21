@@ -1079,3 +1079,208 @@ img, video, svg { max-width: 100%; display: block; }
     width: 100%;
   }
 }
+
+/* UI polish pass for narrow and unauthenticated states. */
+.nav-inner button,
+.profile-trigger,
+.backend-config-button,
+.drawer-nav-item {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.nav-inner > .nav-left > button,
+.nav-actions > button {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  flex: 0 0 42px;
+  border-radius: 12px;
+}
+
+.nav-actions > button {
+  justify-content: center;
+}
+
+.nav-brand-center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+}
+
+.brand-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform: scale(1.9);
+  transform-origin: center;
+}
+
+.profile-trigger {
+  min-width: 0;
+  max-width: 190px;
+}
+
+.profile-menu {
+  width: min(360px, calc(100vw - 24px));
+  border-radius: 18px;
+}
+
+.profile-menu-header {
+  padding: 18px;
+}
+
+.profile-menu-meta {
+  padding: 14px 18px;
+}
+
+.profile-meta-row {
+  color: #94a3b8;
+}
+
+.profile-meta-row span:first-child {
+  font-size: 12px;
+}
+
+.profile-meta-row code {
+  max-width: 164px;
+  color: #cbd5e1;
+}
+
+.drawer-panel {
+  width: min(340px, 92vw);
+  max-width: 340px;
+}
+
+.drawer-nav-item {
+  min-height: 68px;
+  padding: 12px;
+}
+
+.drawer-nav-title-row {
+  align-items: flex-start;
+}
+
+.drawer-nav-title-row span:first-child {
+  white-space: normal;
+  line-height: 1.25;
+}
+
+.drawer-nav-title-row span:last-child {
+  max-width: 96px;
+  padding: 3px 7px;
+  font-size: 10px;
+  line-height: 1.1;
+  text-align: center;
+}
+
+.backend-banner > div:first-child {
+  min-width: min(100%, 260px);
+}
+
+.backend-config-button {
+  min-width: 178px;
+  max-width: 100%;
+  min-height: 42px;
+  padding-inline: 18px;
+  white-space: normal;
+  line-height: 1.25;
+  text-align: center;
+}
+
+.app-shell > main.flex-1 > .min-h-screen {
+  min-height: 100vh;
+  padding: 28px 16px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(239, 68, 68, 0.08), transparent 34%),
+    #000;
+}
+
+.app-shell > main.flex-1 > .min-h-screen > .absolute {
+  display: none;
+}
+
+.app-shell > main.flex-1 > .min-h-screen > .relative.z-10 {
+  width: min(100%, 520px);
+  padding: 26px 22px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 18px;
+  background: rgba(8, 12, 22, 0.72);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.48);
+}
+
+.app-shell > main.flex-1 > .min-h-screen h1 {
+  margin-bottom: 12px;
+  font-size: clamp(2.25rem, 10vw, 4rem);
+  line-height: 1.02;
+}
+
+.app-shell > main.flex-1 > .min-h-screen p {
+  margin-bottom: 20px;
+  color: #93c5fd;
+  font-size: clamp(0.95rem, 4vw, 1.1rem);
+}
+
+.app-shell > main.flex-1 > .min-h-screen button {
+  min-height: 42px;
+  padding: 10px 18px;
+  border-radius: 12px;
+  line-height: 1.2;
+}
+
+.app-shell > main.flex-1 > .min-h-screen .inline-flex.items-center.gap-2 {
+  font-size: 0;
+}
+
+.app-shell > main.flex-1 > .min-h-screen .inline-flex.items-center.gap-2::after {
+  content: "401 Unauthorized";
+  font-size: 12px;
+}
+
+.app-shell > main.flex-1 > .min-h-screen p.mt-8 {
+  font-size: 0;
+}
+
+.app-shell > main.flex-1 > .min-h-screen p.mt-8::after {
+  content: "Elasticease Core Platform - v1.0.0";
+  color: #334155;
+  font-size: 12px;
+}
+
+@media (max-width: 640px) {
+  .brand-lockup .gradient-text {
+    display: inline-block;
+    font-size: 1rem;
+  }
+
+  .nav-brand-center {
+    gap: 8px;
+  }
+
+  .nav-brand-center > div {
+    width: 40px;
+    height: 40px;
+  }
+
+  .profile-trigger {
+    padding: 5px;
+  }
+
+  .profile-trigger > span:not(.animate-pulse) {
+    display: none;
+  }
+
+  .backend-banner {
+    align-items: stretch;
+  }
+
+  .backend-banner > div:first-child,
+  .backend-config-button {
+    width: 100%;
+  }
+
+  .drawer-panel {
+    width: min(330px, 94vw);
+  }
+}
