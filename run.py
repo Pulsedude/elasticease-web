@@ -1,16 +1,17 @@
 from rich.console import Console
-from backend import config
 import webbrowser
 import subprocess
 import time
+import yaml
 import sys
 
 console = Console()
 
+# read configuration file
+with open("./config.yaml", "r") as file: 
+    configuration = yaml.safe_load(file)
+    
 try:
-    # read configuration for frontend & backend server host and port info
-    configuration = config.read()
-
     if isinstance(configuration, tuple):
         console.print(
             f"[!] Something went wrong! {configuration[1]}", style="bold red")
@@ -60,7 +61,7 @@ Starting [bold]Elasticease web[/bold]...
         cwd="backend"
     )
     
-    time.sleep(5)
+    time.sleep(10)
     webbrowser.open(f"http://{frontend_sev_host}:{frontend_sev_port}/login")
 
     frontend.wait()
@@ -72,3 +73,4 @@ except KeyboardInterrupt:
 
 except Exception as e:
     console.print(e, style="bold red")
+

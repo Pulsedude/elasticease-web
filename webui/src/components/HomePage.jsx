@@ -53,7 +53,7 @@ export default function HomePage({ user, onNavigateToTab, theme }) {
             <button onClick={() => onNavigateToTab('console')} type="button"
               data-variant="primary"
               className="flex items-center gap-2 px-6 py-3.5 rounded-[14px] border-none text-white font-bold text-sm cursor-pointer transition-all hover:-translate-y-0.5"
-              style={{ background: 'linear-gradient(135deg, #6366f1, #a855f7)', boxShadow: '0 8px 24px rgba(99,102,241,0.35)' }}
+              style={{ background: 'linear-gradient(135deg, #5d60e6, #5599f7)', boxShadow: '0 8px 24px rgba(99,102,241,0.35)' }}
             >
               <TerminalIcon className="w-5 h-5" /> Launch Console <ChevronRightIcon className="w-4 h-4" />
             </button>
@@ -102,7 +102,7 @@ export default function HomePage({ user, onNavigateToTab, theme }) {
           </div>
           <h2 className={`text-xl md:text-[28px] font-extrabold tracking-tight ${
             isDark ? 'text-slate-100' : 'text-slate-900'
-          }`}>Élasticease Console App</h2>
+          }`}>Elasticease Console App</h2>
           <p className={`text-[13px] mt-1.5 max-w-[520px] ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
             Full CLI power inside your browser — execute REST commands, inspect indices, and manage node operations in real-time.
           </p>
@@ -141,7 +141,7 @@ export default function HomePage({ user, onNavigateToTab, theme }) {
           <p className="text-xs text-slate-500">Frontend is configured to sync with your Python backend (run.py).</p>
         </div>
         <button onClick={() => onNavigateToTab('settings')} type="button"
-          className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[13px] cursor-pointer transition-colors border-none whitespace-nowrap"
+          className="backend-config-button px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[13px] cursor-pointer transition-colors border-none"
         >
           Configure Endpoints
         </button>

@@ -14,6 +14,7 @@ const __dirname = path.dirname(__filename);
 const configPath = path.resolve(__dirname, '../config.yaml');
 const fileContents = fs.readFileSync(configPath, "utf8");
 const config = yaml.parse(fileContents);
+const frontendBootId = `${Date.now()}`;
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -26,5 +27,6 @@ export default defineConfig({
     // Expose backend config to frontend
     __BACKEND_HOST__: JSON.stringify(config.elasticease_web.backend.host),
     __BACKEND_PORT__: JSON.stringify(config.elasticease_web.backend.port),
+    __FRONTEND_BOOT_ID__: JSON.stringify(frontendBootId),
   }
 })
