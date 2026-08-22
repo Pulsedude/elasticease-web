@@ -6,6 +6,7 @@ from .models import (
 
 import json
 
+
 router = APIRouter(prefix="/v1")
 coreops = CoreOps()
 
@@ -46,9 +47,9 @@ def authorization(credentials: LoginCredentials):
 
 
 @router.get("/cluster_status", status_code=status.HTTP_200_OK)
-def to_check_the_active_cluster_status():
+def to_check_the_active_cluster_status(ai_response: bool = False):
     try:
-        cluster_health = coreops.check_cluster_status()
+        cluster_health = coreops.check_cluster_status(ai_response)
 
         if cluster_health.get("success") is False:
             raise HTTPException(

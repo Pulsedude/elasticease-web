@@ -50,6 +50,8 @@ Starting [bold]Elasticease web[/bold]...
     # start backend FastAPI server
     backend = subprocess.Popen(
         [
+            sys.executable,
+            "-m",
             "uvicorn",
             "api:app",
             "--reload",
