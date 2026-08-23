@@ -41,7 +41,7 @@ class Ollama:
             if response.status_code != 200:
                 return (False, response.status_code)
             
-            return response.json()
+            return response.json().get("message").get("content")
         
         except Exception as e:
             return (False, str(e))
