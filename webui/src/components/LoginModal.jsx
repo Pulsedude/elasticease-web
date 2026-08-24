@@ -6,7 +6,6 @@ import {
   UserIcon,
   EyeIcon,
   EyeOffIcon,
-  SparklesIcon,
   ChevronRightIcon,
 } from "./Icons";
 
@@ -39,11 +38,11 @@ export default function LoginModal({ onLoginSuccess }) {
     setIsLoading(true);
 
     try {
-      console.log("Calling auth API:", `${API_BASE_URL}/v1/auth`);
+      console.log("Calling auth API:", `${API_BASE_URL}/v1/core/auth`);
       console.log("Sending credentials:", { username: username.trim(), password: "***" });
       
       // Call backend auth API with POST and credentials
-      const response = await fetch(`${API_BASE_URL}/v1/auth`, {
+      const response = await fetch(`${API_BASE_URL}/v1/core/auth`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -93,21 +92,18 @@ export default function LoginModal({ onLoginSuccess }) {
     }
   };
 
-  const handleDemoLogin = async () => {
-    // For demo, just show a message to use actual credentials
-    setErrorMsg("Please enter your Elasticsearch username and password (from config.yaml) to login.");
-  };
-
   const containerStyle = {
     position: "fixed",
     top: "0",
     left: "0",
-    width: "100vw",
-    height: "100vh",
+    width: "100%",
+    height: "100dvh",      /* dynamic viewport height — respects mobile browser UI */
+    minHeight: "100vh",    /* fallback for browsers without dvh support */
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    overflow: "hidden",
+    overflowY: "auto",     /* allows scrolling if card is taller than viewport (landscape mobile) */
+    overflowX: "hidden",
     backgroundColor: "#000",
     fontFamily:
       'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
@@ -190,8 +186,8 @@ export default function LoginModal({ onLoginSuccess }) {
   };
 
   const logoContainerStyle = {
-    width: "132px",
-    height: "132px",
+    width: "clamp(96px, 25vw, 132px)",
+    height: "clamp(96px, 25vw, 132px)",
     borderRadius: "100px",
     margin: "0 auto 8px",
     padding: "2px",
@@ -275,40 +271,36 @@ export default function LoginModal({ onLoginSuccess }) {
     <div style={containerStyle}>
       {/* Add keyframe animations and responsive styles */}
       <style>{`
-        @keyframes pulseGlow {
-          0%, 100% { opacity: 0.35; transform: scale(1); }
-          50% { opacity: 0.7; transform: scale(1.06); }
-        }
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-        .animate-spin {
-          animation: spin 0.75s linear infinite;
-        }
-        
-        /* Responsive adjustments */
+        /* Responsive adjustments for login card */
         @media (max-width: 480px) {
           .login-card {
-            padding: 24px 20px !important;
+            padding: 28px 20px !important;
             margin: 16px !important;
             border-radius: 16px !important;
           }
           .login-title {
-            font-size: 24px !important;
+            font-size: 22px !important;
           }
           .glow-orb {
             display: none !important;
           }
         }
-        
+
+        /* Landscape mobile — ensure card is scrollable */
+        @media (max-height: 600px) and (orientation: landscape) {
+          .login-card {
+            padding: 20px 24px !important;
+          }
+        }
+
         @media (max-width: 768px) {
           .glow-orb-1 {
-            width: 280px !important;
-            height: 280px !important;
-          }
-          .glow-orb-2 {
             width: 240px !important;
             height: 240px !important;
+          }
+          .glow-orb-2 {
+            width: 200px !important;
+            height: 200px !important;
           }
         }
       `}</style>
@@ -351,6 +343,8 @@ export default function LoginModal({ onLoginSuccess }) {
           {/* Error message */}
           {errorMsg && (
             <div
+              role="alert"
+              aria-live="assertive"
               style={{
                 marginBottom: "20px",
                 padding: "12px 16px",
@@ -382,6 +376,7 @@ export default function LoginModal({ onLoginSuccess }) {
             {/* Username field */}
             <div style={{ marginBottom: "16px" }}>
               <label
+                htmlFor="login-username-input"
                 style={{
                   display: "block",
                   fontSize: "11px",
@@ -408,11 +403,13 @@ export default function LoginModal({ onLoginSuccess }) {
                   <UserIcon style={{ width: "16px", height: "16px" }} />
                 </span>
                 <input
+                  id="login-username-input"
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="Enter your username"
                   style={inputStyle}
+                  autoComplete="username"
                   onFocus={(e) =>
                     (e.currentTarget.style.border = "1px solid #6366f1")
                   }
@@ -436,6 +433,7 @@ export default function LoginModal({ onLoginSuccess }) {
                 }}
               >
                 <label
+                  htmlFor="login-password-input"
                   style={{
                     fontSize: "11px",
                     fontWeight: "bold",
@@ -461,11 +459,13 @@ export default function LoginModal({ onLoginSuccess }) {
                   <LockIcon style={{ width: "16px", height: "16px" }} />
                 </span>
                 <input
+                  id="login-password-input"
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
                   style={{ ...inputStyle, paddingRight: "44px" }}
+                  autoComplete="current-password"
                   onFocus={(e) =>
                     (e.currentTarget.style.border = "1px solid #6366f1")
                   }
@@ -478,6 +478,7 @@ export default function LoginModal({ onLoginSuccess }) {
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                   style={{
                     position: "absolute",
                     right: "14px",
@@ -504,6 +505,7 @@ export default function LoginModal({ onLoginSuccess }) {
               type="submit"
               disabled={isLoading}
               style={buttonStyle}
+              aria-label={isLoading ? "Signing in..." : "Sign In"}
               onMouseEnter={(e) => {
                 if (!isLoading)
                   e.currentTarget.style.transform = "translateY(-1px)";
