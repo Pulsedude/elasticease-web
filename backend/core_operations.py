@@ -73,7 +73,7 @@ class CoreOps:
         except Exception as e:
             return (False, str(e))
 
-    def make_request(self, path: str = "."):
+    def make_request(self, path: str = ""):
         """Base request method to make request on target path
         """
         try:
@@ -83,17 +83,17 @@ class CoreOps:
                     "error": "Elasticsearch base url not provided!"
                 }
 
+            url = f"{self.elastic_base_url.rstrip('/')}/{path.lstrip('/')}" if path else self.elastic_base_url.rstrip(
+                '/')
             response = requests.get(
-                self.elastic_base_url +
-                path if self.elastic_base_url.endswith(
-                    "/") else self.elastic_base_url + "/" + path,
+                url,
                 timeout=10,
                 auth=self.auth,
                 verify=self.verify_certs
             )
 
             if response.status_code == 401:
-                return {"success": False, "status": "alive", "response": "failed to authorized!"}
+                return {"success": False, "status": "alive", "response": "failed to authorize"}
 
             return {"success": True, "status": "alive", "response": response.json()}
         except Exception as e:
@@ -109,14 +109,17 @@ class CoreOps:
             start = time.perf_counter()
 
             # response from elasticsearch API
-            self.make_request()
+            res = self.make_request()
 
             end = time.perf_counter()
+
+            if res.get("success") is False:
+                return res
 
             return {
                 "success": True,
                 "status": "alive",
-                "response": (end - start) * 1000
+                "response": round((end - start) * 1000, 2)
             }
 
         except Exception as e:
@@ -129,7 +132,7 @@ class CoreOps:
         """Check authorization By making request to base url of elasticsearch
         """
         try:
-            response = response = requests.get(
+            response = requests.get(
                 self.elastic_base_url,
                 timeout=10,
                 auth=(username, password),
@@ -146,7 +149,7 @@ class CoreOps:
                 "error": str(e)
             }
 
-    def check_cluster_status(self, ai_response: bool):
+    def check_cluster_status(self, ai_response: bool = False):
         """check the active cluster status (health)
         """
         try:
@@ -187,7 +190,7 @@ class CoreOps:
                 "error": str(e)
             }
 
-    def shards(self, ai_response: bool):
+    def shards(self, ai_response: bool = False):
         """Return the all available active shards. Cluster -> Node -> Shards
         """
         try:
@@ -228,7 +231,7 @@ class CoreOps:
                 "error": str(e)
             }
 
-    def indices(self):
+    def indices(self, ai_response: bool = False):
         """Return the all available indices
         """
         try:
@@ -284,5 +287,46 @@ class CoreOps:
         except Exception as e:
             return {
                 "success": False,
+                "error": str(e)
+            }
+
+    def nodes(self, ai_response: bool):
+        """Return total number active nodes on the running cluster with their information
+        """
+        try:
+            response = self.make_request("_cat/nodes?format=json")
+
+            if ai_response:
+                # check whether AI Mode is On of Off
+
+                ai_mode = self.check_ai_mode()
+                if not ai_mode:
+                    return response
+
+                 # check api response if it is an error then take action further on it
+                if response.get("success") is False:
+                    return response
+
+                # ask AI-Model
+                ai_response = self.ask_ai(
+                    f"{response.get("response")}\n\nHere is the all active nodes running on elasticsearch cluster now please can you provide better explaination according to all active nodes data which is more understandable. (start direclty from explaination)")
+
+                if isinstance(ai_response, tuple):
+                    return {
+                        "success": False,
+                        "error": ai_response[1]
+                    }
+
+                return {
+                    "success": True,
+                    "status": "alive",
+                    "response": ai_response
+                }
+
+            return response
+
+        except Exception as e:
+            return {
+                "sccuess": False,
                 "error": str(e)
             }

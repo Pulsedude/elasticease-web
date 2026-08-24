@@ -6,9 +6,37 @@ from .models import (
 
 import json
 
-
-router = APIRouter(prefix="/v1")
+router = APIRouter(prefix="/v1/core")
 coreops = CoreOps()
+
+
+@router.get("/latency", status_code=status.HTTP_200_OK)
+def see_latency_of_api():
+    """Return the latency of Elasticsearch API 
+    """
+    try:
+        elasticsearch_api_latency = coreops.ping_of_elastic_api()
+
+        if elasticsearch_api_latency.get("success") is False and elasticsearch_api_latency.get("response") == "failed to authorize":
+            return Response(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                content=json.dumps(elasticsearch_api_latency),
+                media_type="application/json"
+            )
+        if elasticsearch_api_latency.get("success") is False:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=elasticsearch_api_latency
+            )
+
+        return elasticsearch_api_latency
+    
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": str(e)})
 
 
 @router.post("/auth", status_code=status.HTTP_200_OK)
@@ -48,6 +76,8 @@ def authorization(credentials: LoginCredentials):
 
 @router.get("/cluster_status", status_code=status.HTTP_200_OK)
 def to_check_the_active_cluster_status(ai_response: bool = False):
+    """Return the health & details of active cluster
+    """
     try:
         cluster_health = coreops.check_cluster_status(ai_response)
 
@@ -69,6 +99,8 @@ def to_check_the_active_cluster_status(ai_response: bool = False):
 
 @router.get("/shards", status_code=status.HTTP_200_OK)
 def see_total_number_of_available_shards():
+    """Return to total number of active shards on target node with detailed information
+    """
     try:
         get_shards = coreops.shards()
 
@@ -80,7 +112,55 @@ def see_total_number_of_available_shards():
             return Response(status_code=status.HTTP_403_FORBIDDEN, content=json.dumps(get_shards), media_type="application/json")
 
         return get_shards
-    
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": str(e)})
+        
+        
+@router.get("/nodes", status_code=status.HTTP_200_OK)
+def see_total_number_active_nodes(ai_response: bool):
+    """Return to total number of active nodes running on cluster
+    """
+    try:
+        get_nodes = coreops.nodes(ai_response)
+
+        if get_nodes.get("success") is False:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=get_nodes)
+
+        if get_nodes.get("success") is False and get_nodes.get("response") == "failed to authorize":
+            return Response(status_code=status.HTTP_403_FORBIDDEN, content=json.dumps(get_nodes), media_type="application/json")
+
+        return get_nodes
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": str(e)})
+        
+        
+@router.get("/indices", status_code=status.HTTP_200_OK)
+def see_all_indices(ai_response: bool = False):
+    """Return the total number indices on active nodes 
+    """
+    try:
+        get_indices = coreops.indices(ai_response)
+
+        if get_indices.get("success") is False:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=get_indices)
+
+        if get_indices.get("success") is False and get_indices.get("response") == "failed to authorize":
+            return Response(status_code=status.HTTP_403_FORBIDDEN, content=json.dumps(get_indices), media_type="application/json")
+
+        return get_indices
+
     except HTTPException:
         raise
 
