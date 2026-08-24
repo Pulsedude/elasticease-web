@@ -28,5 +28,6 @@ export default defineConfig({
     __BACKEND_HOST__: JSON.stringify(config.elasticease_web.backend.host),
     __BACKEND_PORT__: JSON.stringify(config.elasticease_web.backend.port),
     __FRONTEND_BOOT_ID__: JSON.stringify(frontendBootId),
+    __ES_BASE_URL__: JSON.stringify(config.elasticease_web.elasticsearch.base_url),
   }
 })

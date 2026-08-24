@@ -7,21 +7,22 @@ export default function NotFoundPage() {
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-black relative overflow-hidden">
-      {/* Ambient orbs */}
+      {/* Ambient orbs — use % sizes so they never exceed viewport */}
       <div
-        className="absolute top-[10%] right-[5%] w-[450px] h-[450px] rounded-full pointer-events-none opacity-20"
+        className="absolute top-[10%] right-[5%] w-[40vw] max-w-[450px] h-[40vw] max-h-[450px] rounded-full pointer-events-none opacity-20"
         style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.25), transparent 70%)' }}
       />
       <div
-        className="absolute bottom-[10%] left-[5%] w-[380px] h-[380px] rounded-full pointer-events-none opacity-15"
+        className="absolute bottom-[10%] left-[5%] w-[35vw] max-w-[380px] h-[35vw] max-h-[380px] rounded-full pointer-events-none opacity-15"
         style={{ background: 'radial-gradient(circle, rgba(168,85,247,0.2), transparent 70%)' }}
       />
 
-      <div className="relative z-10 text-center px-6 max-w-lg mx-auto">
-        {/* Giant 404 */}
+      <div className="relative z-10 text-center px-6 max-w-lg mx-auto w-full">
+        {/* Giant 404 — clamped so it never overflows on small screens */}
         <p
-          className="text-[120px] md:text-[160px] font-extrabold leading-none mb-2 select-none"
+          className="font-extrabold leading-none mb-2 select-none"
           style={{
+            fontSize: 'clamp(72px, 20vw, 160px)',
             background: 'linear-gradient(135deg, #1e293b, #334155)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
@@ -37,12 +38,12 @@ export default function NotFoundPage() {
           Page Not Found
         </div>
 
-        <h1 className="text-3xl md:text-4xl font-extrabold text-white tracking-tight mb-4">
+        <h1 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight mb-4">
           Oops! Wrong{' '}
           <span className="gradient-text">Route</span>
         </h1>
 
-        <p className="text-slate-400 text-base leading-relaxed mb-8 max-w-sm mx-auto">
+        <p className="text-slate-400 text-sm sm:text-base leading-relaxed mb-8 max-w-sm mx-auto">
           The page you're looking for doesn't exist or has been moved. Head back to the dashboard.
         </p>
 

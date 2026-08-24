@@ -7,25 +7,25 @@ export default function UnauthorizedPage() {
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-black relative overflow-hidden">
-      {/* Ambient orbs */}
+      {/* Ambient orbs — viewport-relative to prevent horizontal scroll on mobile */}
       <div
-        className="absolute top-[10%] left-[5%] w-[500px] h-[500px] rounded-full pointer-events-none opacity-30"
+        className="absolute top-[10%] left-[5%] w-[45vw] max-w-[500px] h-[45vw] max-h-[500px] rounded-full pointer-events-none opacity-30"
         style={{ background: 'radial-gradient(circle, rgba(239,68,68,0.2), transparent 70%)' }}
       />
       <div
-        className="absolute bottom-[10%] right-[5%] w-[400px] h-[400px] rounded-full pointer-events-none opacity-20"
+        className="absolute bottom-[10%] right-[5%] w-[38vw] max-w-[400px] h-[38vw] max-h-[400px] rounded-full pointer-events-none opacity-20"
         style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.2), transparent 70%)' }}
       />
 
-      <div className="relative z-10 text-center px-6 max-w-lg mx-auto">
+      <div className="relative z-10 text-center px-6 max-w-lg mx-auto w-full">
         {/* Icon */}
         <div className="flex items-center justify-center mb-8">
           <div
-            className="w-24 h-24 rounded-[24px] flex items-center justify-center p-0.5"
+            className="w-20 h-20 sm:w-24 sm:h-24 rounded-[24px] flex items-center justify-center p-0.5"
             style={{ background: 'linear-gradient(135deg, #ef4444, #f97316)' }}
           >
             <div className="w-full h-full bg-black rounded-[22px] flex items-center justify-center">
-              <LockIcon className="w-10 h-10 text-red-400" />
+              <LockIcon className="w-8 h-8 sm:w-10 sm:h-10 text-red-400" />
             </div>
           </div>
         </div>
@@ -37,7 +37,7 @@ export default function UnauthorizedPage() {
         </div>
 
         {/* Heading */}
-        <h1 className="text-4xl md:text-5xl font-extrabold text-white tracking-tight mb-4 leading-tight">
+        <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white tracking-tight mb-4 leading-tight">
           Access{' '}
           <span style={{
             background: 'linear-gradient(135deg, #ef4444, #f97316)',
@@ -49,7 +49,7 @@ export default function UnauthorizedPage() {
           </span>
         </h1>
 
-        <p className="text-slate-400 text-base leading-relaxed mb-8 max-w-sm mx-auto">
+        <p className="text-slate-400 text-sm sm:text-base leading-relaxed mb-8 max-w-sm mx-auto">
           You need to be signed in to access this page. Please log in with your credentials to continue.
         </p>
 
