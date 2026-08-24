@@ -271,24 +271,7 @@ class CoreOps:
                 "success": False,
                 "error": str(e)
             }
-
-    def total_documents(self):
-        """Return the total number documents saved in all available indices
-        """
-        try:
-            response = self.make_request("_cat/indices?format=json")
-            total_docs = 0
-
-            for index in response.get("response"):
-                total_docs += index.get("docs.count")
-
-            return {"success": True, "status": "alive", "response": {"total documents": total_docs}}
-
-        except Exception as e:
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            
 
     def nodes(self, ai_response: bool):
         """Return total number active nodes on the running cluster with their information
