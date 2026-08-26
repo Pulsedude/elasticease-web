@@ -51,9 +51,7 @@ export default function Navbar({ user, onLogout, theme, toggleTheme, onOpenDrawe
   }, []);
 
   return (
-    <header className={`app-header sticky top-0 z-30 w-full transition-colors duration-200 ${
-      isDark ? "bg-[rgba(6,6,8,0.97)] border-[#1e2130]" : "bg-[rgba(255,255,255,0.97)] border-[#e2e8f0]"
-    }`}>
+    <header className="app-header">
       <div className="nav-inner">
 
         {/* LEFT: menu + brand */}
@@ -63,23 +61,21 @@ export default function Navbar({ user, onLogout, theme, toggleTheme, onOpenDrawe
             type="button"
             title="Open navigation menu"
             aria-label="Open navigation menu"
-            className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors border cursor-pointer ${
-              isDark ? "border-[#1e2130] text-slate-400 hover:bg-[#111116] hover:text-slate-200" : "border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
-            }`}
+            className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-colors ${isDark ? "border-[#1e2130] hover:bg-[#1e2130] text-slate-400 hover:text-slate-100" : "border-slate-200 hover:bg-slate-100 text-slate-500 hover:text-slate-900"}`}
           >
             <MenuIcon className="w-4 h-4" />
           </button>
 
-          <div className="nav-brand-center flex items-center gap-2.5">
-            <div className={`w-7 h-7 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0 ${isDark ? "bg-[#0c0c10]" : "bg-white"}`}
-              style={{ boxShadow: "0 0 0 1px rgba(99,102,241,0.25)" }}>
+          <div className="nav-brand-center flex items-center gap-3">
+            <div className={`w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0 border ${isDark ? "border-[#1e2130]" : "border-slate-200"}`}
+                 style={{ boxShadow: "0 0 0 1px rgba(99,102,241,0.25)" }}>
               {!logoError ? (
                 <img src={logo} alt="Elasticease Logo" className="brand-logo-img" onError={() => setLogoError(true)} />
               ) : (
                 <ShieldIcon className="w-4 h-4 text-indigo-400" />
               )}
             </div>
-            <span className="gradient-text font-bold text-[15px] tracking-tight leading-none">elasticease</span>
+            <span className="gradient-text font-bold text-xl tracking-tight leading-none">elasticease</span>
           </div>
         </div>
 
@@ -90,9 +86,7 @@ export default function Navbar({ user, onLogout, theme, toggleTheme, onOpenDrawe
             type="button"
             title={isDark ? "Switch to light mode" : "Switch to dark mode"}
             aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
-            className={`w-8 h-8 flex items-center justify-center rounded-lg border cursor-pointer transition-colors ${
-              isDark ? "border-[#1e2130] text-slate-400 hover:bg-[#111116] hover:text-slate-200" : "border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
-            }`}
+            className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-colors ${isDark ? "border-[#1e2130] hover:bg-[#1e2130] text-slate-400 hover:text-slate-100" : "border-slate-200 hover:bg-slate-100 text-slate-500 hover:text-slate-900"}`}
           >
             {isDark ? <SunIcon className="w-4 h-4 text-amber-400" /> : <MoonIcon className="w-4 h-4 text-indigo-500" />}
           </button>
@@ -106,29 +100,30 @@ export default function Navbar({ user, onLogout, theme, toggleTheme, onOpenDrawe
               aria-expanded={profileOpen}
               aria-haspopup="true"
             >
-              <div className="w-7 h-7 rounded-lg flex-shrink-0 flex items-center justify-center text-white font-bold text-[12px]"
-                style={{ background: "linear-gradient(135deg,#6366f1,#a855f7)" }}>
+              <div className="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center"
+                   style={{ background: "linear-gradient(135deg,#6366f1,#a855f7)" }}>
                 {user?.name ? user.name.charAt(0).toUpperCase() : "A"}
               </div>
-              <span className={`text-[13px] font-semibold max-w-[100px] truncate hidden xs:inline-block ${isDark ? "text-slate-200" : "text-slate-800"}`}>
+              <span className={`text-sm font-semibold truncate hidden sm:inline-block ${isDark ? "text-slate-100" : "text-slate-900"}`}>
                 {user?.name || "User"}
               </span>
-              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${health.dot} animate-pulse`} />
+              <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 inline-block animate-pulse ${health.dot}`} />
             </button>
 
             {profileOpen && (
-              <div className={`profile-menu dropdown-enter ${isDark ? "bg-[#0c0c10] border-[#1e2130]" : "bg-white border-slate-200"}`} role="menu">
+              <div className="profile-menu dropdown-enter" role="menu">
                 <div className="profile-menu-header">
-                  <div className="flex items-center gap-3">
-                    <div className="profile-avatar" style={{ background: "linear-gradient(135deg,#6366f1,#a855f7)" }}>
+                  <div className="flex items-center gap-4">
+                    <div className="profile-avatar" 
+                         style={{ background: "linear-gradient(135deg,#6366f1,#a855f7)" }}>
                       {user?.name ? user.name.charAt(0).toUpperCase() : "A"}
                     </div>
                     <div className="min-w-0">
                       <p className={`font-semibold text-sm truncate ${isDark ? "text-slate-100" : "text-slate-900"}`}>{user?.name || "admin"}</p>
-                      <p className="text-[11px] text-slate-500 truncate">{user?.email || `${(user?.name || "admin").toLowerCase()}@elasticease.io`}</p>
-                      <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
-                        isDark ? "bg-indigo-500/10 text-indigo-300 border-indigo-500/25" : "bg-indigo-50 text-indigo-700 border-indigo-200"
-                      }`}>{user?.role || "Cluster Administrator"}</span>
+                      <p className={`text-xs truncate ${isDark ? "text-slate-500" : "text-slate-400"}`}>{user?.email || `${(user?.name || "admin").toLowerCase()}@elasticease.io`}</p>
+                      <span className={`inline-block mt-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${isDark ? "bg-indigo-500/10 text-indigo-300 border-indigo-500/25" : "bg-indigo-50 text-indigo-700 border-indigo-200"}`}>
+                        {user?.role || "Cluster Administrator"}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -136,36 +131,34 @@ export default function Navbar({ user, onLogout, theme, toggleTheme, onOpenDrawe
                 <div className="profile-menu-meta">
                   {/* Connected Node — real ES host from config.yaml */}
                   <div className="profile-meta-row">
-                    <span className="flex items-center gap-1.5">
+                    <span className="flex items-center gap-3">
                       <ServerIcon className="w-3.5 h-3.5 text-indigo-400" /> Connected Node
                     </span>
-                    <code className={`text-[11px] px-1.5 py-0.5 rounded font-mono ${isDark ? "bg-[#1e2130] text-slate-300" : "bg-slate-100 text-slate-700"}`}>
+                    <code className={`text-xs font-mono px-2 py-0.5 rounded ${isDark ? "bg-[#1e2130] text-slate-300" : "bg-slate-100 text-slate-700"}`}>
                       {esHost}
                     </code>
                   </div>
 
                   {/* Cluster Health — live from API */}
-                  <div className="profile-meta-row" style={{ marginBottom: 0 }}>
-                    <span className="flex items-center gap-1.5">
+                  <div className="profile-meta-row">
+                    <span className="flex items-center gap-3">
                       <ActivityIcon className="w-3.5 h-3.5 text-emerald-500" /> Cluster Health
                     </span>
-                    <span className={`flex items-center gap-1 font-semibold text-xs ${health.color}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${health.dot}`} />
+                    <span className={`flex items-center gap-2 font-semibold text-xs ${isDark ? "text-slate-100" : "text-slate-900"}`}>
+                      <span className={`w-2 h-2 rounded-full inline-block ${health.dot}`} />
                       {health.label}
                     </span>
                   </div>
                 </div>
 
-                <div className="p-2">
+                <div className="p-3">
                   <button
                     onClick={() => { setProfileOpen(false); onLogout(); }}
                     type="button"
                     role="menuitem"
-                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-red-500 text-xs font-semibold cursor-pointer transition-colors bg-transparent border-none ${
-                      isDark ? "hover:bg-red-500/8" : "hover:bg-red-50"
-                    }`}
+                    className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-red-500 text-xs font-semibold cursor-pointer transition-colors hover:bg-red-500/5 hover:text-red-400"
                   >
-                    <span className="flex items-center gap-2"><LogOutIcon className="w-4 h-4" /> Sign out</span>
+                    <span className="flex items-center gap-3"><LogOutIcon className="w-4 h-4" /> Sign out</span>
                     <ChevronRightIcon className="w-3.5 h-3.5 opacity-50" />
                   </button>
                 </div>
@@ -177,4 +170,3 @@ export default function Navbar({ user, onLogout, theme, toggleTheme, onOpenDrawe
     </header>
   );
 }
-

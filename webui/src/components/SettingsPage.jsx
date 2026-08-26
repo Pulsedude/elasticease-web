@@ -36,12 +36,11 @@ export default function SettingsPage({ theme }) {
         </div>
       )}
 
-      <div className={`settings-card ${isDark ? "bg-[#0c0c10] border-[#1e2130]" : "bg-white border-slate-200 shadow-sm"}`}>
-
+      <div className="settings-card bg-surface border-base border shadow-surface-sm">
         {/* Section label */}
-        <div className={`flex items-center gap-2 mb-6 pb-4 border-b ${isDark ? "border-[#1e2130]" : "border-slate-100"}`}>
+        <div className="flex items-center gap-2 mb-6 pb-4 border-b border-base">
           <ServerIcon className={`w-4 h-4 ${isDark ? "text-indigo-400" : "text-indigo-600"}`} />
-          <span className={`text-sm font-semibold ${isDark ? "text-slate-200" : "text-slate-800"}`}>Endpoint Configuration</span>
+          <span className="text-sm font-semibold text-primary">Endpoint Configuration</span>
         </div>
 
         <form className="settings-form" onSubmit={handleSave}>
@@ -53,7 +52,7 @@ export default function SettingsPage({ theme }) {
               value={backendUrl}
               onChange={e => setBackendUrl(e.target.value)}
               placeholder="http://localhost:8000/api"
-              className={isDark ? "bg-[#060608] text-slate-100 border-[#1e2130] focus:border-indigo-500" : "bg-slate-50 text-slate-900 border-slate-200 focus:border-indigo-500"}
+              className="bg-base-surface text-primary border-base focus:border-indigo-500"
               required
             />
             <p>Points to your Python server configured in <code className={`text-[11px] px-1 py-0.5 rounded font-mono ${isDark ? "bg-[#1e2130] text-indigo-300" : "bg-slate-100 text-indigo-700"}`}>config.yaml</code>.</p>
@@ -67,7 +66,7 @@ export default function SettingsPage({ theme }) {
               value={esHost}
               onChange={e => setEsHost(e.target.value)}
               placeholder="http://localhost:9200"
-              className={isDark ? "bg-[#060608] text-slate-100 border-[#1e2130] focus:border-indigo-500" : "bg-slate-50 text-slate-900 border-slate-200 focus:border-indigo-500"}
+              className="bg-base-surface text-primary border-base focus:border-indigo-500"
               required
             />
             <p>Direct Elasticsearch REST API endpoint used by the Console.</p>
@@ -76,8 +75,7 @@ export default function SettingsPage({ theme }) {
           <div className="settings-actions">
             <button
               type="submit"
-              style={{ background: "linear-gradient(135deg,#4f46e5,#7c3aed)" }}
-              className="hover:opacity-90 transition-opacity font-semibold cursor-pointer"
+              className="bg-accent hover:bg-accent-hover text-white transition-colors font-semibold cursor-pointer"
             >
               Save Settings
             </button>

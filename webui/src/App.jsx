@@ -96,7 +96,7 @@ function AppContent() {
   const contentClass = showShell ? getPageContentClass(location.pathname) : "";
 
   return (
-    <div className={`app-shell min-h-screen w-full flex flex-col ${isDark ? "bg-[#060608] text-slate-100" : "bg-[#f4f6f9] text-slate-900"}`}>
+    <div className="app-shell bg-base-surface text-primary">
 
       {showShell && (
         <>
@@ -118,7 +118,7 @@ function AppContent() {
         </>
       )}
 
-      <main className="app-main flex-1 w-full">
+      <main className="app-main">
         {showShell ? (
           <div className={contentClass}>
             <Routes>
