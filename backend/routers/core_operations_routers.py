@@ -122,7 +122,7 @@ def see_total_number_of_available_shards():
         
         
 @router.get("/nodes", status_code=status.HTTP_200_OK)
-def see_total_number_active_nodes(ai_response: bool):
+def see_total_number_active_nodes(ai_response: bool = False):
     """Return to total number of active nodes running on cluster
     """
     try:

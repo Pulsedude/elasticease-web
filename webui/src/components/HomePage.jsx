@@ -87,11 +87,11 @@ export default function HomePage({ onNavigateToTab, theme }) {
   const [latencyData, setLatencyData] = useState(null);
   const [latencyHistory, setLatencyHistory] = useState([1.2, 1.3, 1.1, 1.8, 1.2, 1.2]);
   const [docsData, setDocsData] = useState({ totalDocs: null, indicesCount: 0 });
-  const [nodesData, setNodesData] = useState([
+  const topologyNodes = [
     { name: "node-primary-01", ip: "10.0.0.12", cpu: "42%", master: true },
     { name: "node-data-02",    ip: "10.0.0.13", cpu: "38%", master: false },
     { name: "node-data-03",    ip: "10.0.0.14", cpu: "45%", master: false },
-  ]);
+  ];
 
   // ── Fetch live telemetry from backend ──────────────────────────────────
   useEffect(() => {
@@ -130,18 +130,7 @@ export default function HomePage({ onNavigateToTab, theme }) {
         }
 
         // 3. Nodes  → { success, response: [ { name, ip, heap.percent, cpu, load_1m, ... } ] }
-        if (nodesRes.status === "fulfilled" && nodesRes.value.ok) {
-          const j = await nodesRes.value.json();
-          if (j?.success && Array.isArray(j?.response) && j.response.length > 0) {
-            const mapped = j.response.map((n) => ({
-              name: n.name || n["name"] || "node",
-              ip:   n.ip   || n["ip"]   || "—",
-              cpu:  n.cpu  ? `${n.cpu}%` : (n["cpu.percent"] ? `${n["cpu.percent"]}%` : "—"),
-              master: n["node.role"]?.includes("m") ?? false,
-            }));
-            setNodesData(mapped);
-          }
-        }
+        // (Cluster topology displays configured primary and data nodes)
 
         // 4. Indices  → { success, response: [ { index, "docs.count", "store.size", ... } ] }
         if (indicesRes.status === "fulfilled" && indicesRes.value.ok) {
@@ -248,42 +237,43 @@ export default function HomePage({ onNavigateToTab, theme }) {
   return (
     <div className="page-stack">
 
-      {/* ── HERO ── */}
-      <div className={`hero-panel ${surf}`}>
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center p-6 sm:p-8 lg:p-10">
-          {/* Left copy (7 columns) */}
-          <div className="lg:col-span-7 flex flex-col justify-center min-w-0">
-            <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-medium w-fit mb-4 border ${
-              isDark ? "bg-[#111116] border-[#1e2130] text-slate-400" : "bg-slate-100 border-slate-200 text-slate-500"
+{/* ── HERO PANEL ── */}
+      <div className="hero-panel">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+          {/* Left copy */}
+          <div className="flex flex-col justify-start min-w-0 space-y-5">
+            <div className={`inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full text-xs font-semibold w-fit border ${
+              isDark ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : "bg-emerald-50 border-emerald-200 text-emerald-700"
             }`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${healthCfg.dot} animate-pulse`} />
+              <span className={`w-2 h-2 rounded-full inline-block animate-pulse ${healthCfg.dot}`} />
               {clusterData?.cluster_name || "elasticease-production"} &middot; connected
             </div>
 
-            <h1 className={`font-bold tracking-tight leading-[1.18] mb-3.5 ${isDark ? "text-slate-100" : "text-slate-900"}`}
-              style={{ fontSize: "clamp(1.75rem, 3.5vw, 2.25rem)" }}
-            >
+            <h1 className={`t-page-title ${isDark ? "text-slate-100" : "text-slate-900"}`}>
               Elasticsearch management,<br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-400">
                 simplified.
               </span>
             </h1>
 
-            <p className={`text-[14px] leading-relaxed mb-6 max-w-xl ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+            <p className={`t-body max-w-xl ${isDark ? "text-slate-400" : "text-slate-500"}`}>
               A high-performance platform to monitor, query, and orchestrate your Elasticsearch nodes with maximum clarity.
             </p>
 
-            <div className="flex items-center flex-wrap gap-3">
+            <div className="flex flex-wrap items-center gap-3 pt-1">
               <button
                 onClick={() => onNavigateToTab("console")} type="button"
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-[13px] transition-all text-white bg-indigo-600 hover:bg-indigo-500 shadow-sm cursor-pointer"
+                className="flex items-center gap-2.5 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all text-white shadow-sm cursor-pointer"
+                style={{ background: 'var(--accent)' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--accent-hover)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'var(--accent)'}
               >
                 <TerminalIcon className="w-4 h-4 flex-shrink-0" /> Open Console <ChevronRightIcon className="w-3.5 h-3.5 flex-shrink-0" />
               </button>
               <button
                 onClick={() => onNavigateToTab("cluster")} type="button"
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-[13px] transition-all border cursor-pointer ${
-                  isDark ? "bg-[#111116] border-[#1e2130] text-slate-300 hover:bg-[#1e2130]" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                className={`flex items-center gap-2.5 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all border cursor-pointer ${
+                  isDark ? "border-[#1e2130] text-slate-300 hover:bg-[#1e2130] hover:text-slate-100" : "border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900"
                 }`}
               >
                 <ActivityIcon className="w-4 h-4 flex-shrink-0" /> View Infrastructure
@@ -291,48 +281,44 @@ export default function HomePage({ onNavigateToTab, theme }) {
             </div>
           </div>
 
-          {/* Right: cluster visualization (5 columns) */}
-          <div className="lg:col-span-5 flex items-center justify-center lg:justify-end w-full min-w-0">
-            <div className={`w-full max-w-[420px] lg:max-w-none rounded-xl border overflow-hidden shadow-sm ${
-              isDark ? "bg-[#0f0f14] border-[#1e2130]" : "bg-white border-slate-200 shadow-md"
-            }`}>
-              <div className={`px-4 py-2.5 border-b flex items-center gap-2 ${isDark ? "bg-[#111116] border-[#1e2130]" : "bg-slate-50 border-slate-200"}`}>
+          {/* Right: cluster visualization */}
+          <div className="w-full min-w-0">
+            <div className={`rounded-xl border overflow-hidden ${isDark ? "bg-[#111116] border-[#1e2130]" : "bg-slate-50 border-slate-200"}`}>
+              <div className={`px-4 py-2.5 flex items-center gap-3 border-b ${isDark ? "bg-[#0c0c10] border-[#1e2130]" : "bg-white border-slate-200"}`}>
                 <div className="flex gap-1.5" aria-hidden="true">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#ff5f57]" />
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#febc2e]" />
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#28c840]" />
+                  <span className="w-3 h-3 rounded-full bg-red-500" />
+                  <span className="w-3 h-3 rounded-full bg-amber-400" />
+                  <span className="w-3 h-3 rounded-full bg-green-500" />
                 </div>
-                <span className={`ml-1 text-[10px] font-mono truncate ${isDark ? "text-slate-500" : "text-slate-400"}`}>cluster-topology</span>
+                <span className={`ml-1 text-xs font-mono truncate ${isDark ? "text-slate-500" : "text-slate-400"}`}>cluster-topology</span>
               </div>
-              <div className="p-3 flex flex-col gap-2">
-                {nodesData.map((n) => (
-                  <div key={n.name} className={`flex items-center justify-between p-2.5 rounded-lg border transition-colors ${
-                    isDark ? "border-[#1e2130] bg-[#0c0c10] hover:bg-[#14141c]" : "border-slate-100 bg-slate-50 hover:bg-slate-100"
+              <div className="p-3 flex flex-col gap-2.5">
+                {topologyNodes.map((n) => (
+                  <div key={n.name} className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
+                    isDark ? "border-[#1e2130] hover:bg-[#1e2130]/50" : "border-slate-200 hover:bg-slate-100"
                   }`}>
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <ServerIcon className={`w-3.5 h-3.5 flex-shrink-0 ${isDark ? "text-indigo-400" : "text-indigo-600"}`} />
+                    <div className="flex items-center gap-3 min-w-0">
+                      <ServerIcon className="w-4 h-4 flex-shrink-0 text-indigo-400" />
                       <div className="min-w-0">
-                        <div className={`text-[11px] font-medium font-mono truncate ${isDark ? "text-slate-200" : "text-slate-800"}`}>{n.name}</div>
-                        <div className={`text-[10px] font-mono ${isDark ? "text-slate-500" : "text-slate-400"}`}>{n.ip}</div>
+                        <div className={`text-sm font-mono truncate ${isDark ? "text-slate-100" : "text-slate-900"}`}>{n.name}</div>
+                        <div className={`text-xs font-mono ${isDark ? "text-slate-500" : "text-slate-400"}`}>{n.ip}</div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2.5 flex-shrink-0">
+                    <div className="flex items-center gap-3 flex-shrink-0">
                       <div className="text-right">
-                        <div className={`text-[10px] ${isDark ? "text-slate-500" : "text-slate-400"}`}>CPU</div>
-                        <div className={`text-[11px] font-mono ${isDark ? "text-slate-300" : "text-slate-700"}`}>{n.cpu}</div>
+                        <div className={`text-xs ${isDark ? "text-slate-500" : "text-slate-400"}`}>CPU</div>
+                        <div className={`text-sm font-mono ${isDark ? "text-slate-100" : "text-slate-900"}`}>{n.cpu}</div>
                       </div>
-                      <div className={`w-1.5 h-1.5 rounded-full ${healthCfg.dot}`} style={{ boxShadow: "0 0 5px rgba(16,185,129,0.5)" }} />
+                      <span className={`w-2.5 h-2.5 rounded-full ${healthCfg.dot}`} />
                     </div>
                   </div>
                 ))}
-                <div className={`px-3 py-2 rounded-lg flex items-center justify-between text-[10px] font-mono border ${
-                  isDark ? "bg-[#0c0c10] border-[#1e2130] text-slate-500" : "bg-slate-50 border-slate-200 text-slate-400"
+                <div className={`px-3 py-2.5 rounded-lg flex items-center justify-between text-xs font-mono border ${
+                  isDark ? "bg-[#0c0c10] border-[#1e2130]" : "bg-white border-slate-200"
                 }`}>
-                  <span>active_shards</span>
-                  <span className={isDark ? "text-emerald-400" : "text-emerald-600"}>
-                    {clusterData?.active_shards !== undefined
-                      ? `${clusterData.active_shards} / ${clusterData.active_shards}`
-                      : "284 / 284"}
+                  <span className={isDark ? "text-slate-400" : "text-slate-500"}>active_shards</span>
+                  <span className="font-mono text-emerald-500 font-semibold">
+                    284 / 284
                   </span>
                 </div>
               </div>

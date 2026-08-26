@@ -1,27 +1,113 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { ServerIcon, ActivityIcon, ShieldIcon, DatabaseIcon } from "./Icons";
 
 export default function ClusterHealthPage({ theme }) {
   const isDark = theme === "dark";
 
-  const nodes = [
-    { name: "node-primary-01", ip: "10.0.0.12", role: "Master / Data", cpu: "42%", ram: "78%", heap: "38%", docs: "3.1M",  status: "online" },
-    { name: "node-data-02",    ip: "10.0.0.13", role: "Data Node",     cpu: "38%", ram: "74%", heap: "35%", docs: "1.8M",  status: "online" },
-    { name: "node-data-03",   ip: "10.0.0.14", role: "Data Node",     cpu: "45%", ram: "81%", heap: "41%", docs: "1.4M",  status: "online" },
-  ];
+  // Backend config from Vite define
+  const BACKEND_HOST = typeof __BACKEND_HOST__ !== 'undefined' ? __BACKEND_HOST__ : '127.0.0.1';
+  const BACKEND_PORT = typeof __BACKEND_PORT__ !== 'undefined' ? __BACKEND_PORT__ : '8000';
+  const API_BASE_URL = `http://${BACKEND_HOST}:${BACKEND_PORT}`;
 
-  const indices = [
-    { name: "app-logs-2026",    health: "green",  docs: "1,420,891", size: "842 MB", shards: "3/1" },
-    { name: "user-analytics",  health: "green",  docs: "850,210",   size: "310 MB", shards: "2/1" },
-    { name: "product-catalog", health: "green",  docs: "4,102,005", size: "1.24 GB", shards: "5/1" },
-  ];
+  const [isLoading, setIsLoading] = useState(true);
+  const [nodes, setNodes] = useState([]);
+  const [indices, setIndices] = useState([]);
+  const [clusterData, setClusterData] = useState(null);
 
-  const healthDot = isDark ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" : "bg-emerald-500";
+  useEffect(() => {
+    let isMounted = true;
 
+    async function fetchClusterData() {
+      try {
+        const [nodesRes, indicesRes, clusterRes] = await Promise.allSettled([
+          fetch(`${API_BASE_URL}/v1/core/nodes`),
+          fetch(`${API_BASE_URL}/v1/core/indices`),
+          fetch(`${API_BASE_URL}/v1/core/cluster_status`),
+        ]);
+
+        if (!isMounted) return;
+
+        if (nodesRes.status === "fulfilled" && nodesRes.value.ok) {
+          const j = await nodesRes.value.json();
+          if (j?.success && Array.isArray(j?.response)) {
+            setNodes(j.response);
+          }
+        }
+
+        if (indicesRes.status === "fulfilled" && indicesRes.value.ok) {
+          const j = await indicesRes.value.json();
+          if (j?.success && Array.isArray(j?.response)) {
+            setIndices(j.response.filter(idx => !String(idx.index || "").startsWith(".")));
+          }
+        }
+
+        if (clusterRes.status === "fulfilled" && clusterRes.value.ok) {
+          const j = await clusterRes.value.json();
+          if (j?.success && j?.response) {
+            setClusterData(j.response);
+          }
+        }
+
+        if (isMounted) setIsLoading(false);
+      } catch (err) {
+        console.error("[ClusterHealth] Fetch error:", err);
+        if (isMounted) setIsLoading(false);
+      }
+    }
+
+    fetchClusterData();
+    const interval = setInterval(fetchClusterData, 15000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [API_BASE_URL]);
+
+  function getHealthConfig(statusStr) {
+    const s = (statusStr || "").toLowerCase();
+    if (s === "green") return { label: "Green", color: "text-emerald-500 dark:text-emerald-400", dot: "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" };
+    if (s === "yellow") return { label: "Yellow", color: "text-amber-500 dark:text-amber-400", dot: "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.4)]" };
+    if (s === "red") return { label: "Red", color: "text-rose-500 dark:text-rose-400", dot: "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.4)]" };
+    return { label: "Unknown", color: "text-slate-400", dot: "bg-slate-400" };
+  }
+
+  const healthCfg = getHealthConfig(clusterData?.status);
+
+  // Format large numbers
+  const formatNum = (num) => {
+    if (num === undefined || num === null || num === "") return "0";
+    const n = parseInt(String(num).replace(/,/g, ""), 10);
+    if (isNaN(n)) return "0";
+    if (n >= 1000000) return (n / 1000000).toFixed(1) + "M";
+    if (n >= 1000) return (n / 1000).toFixed(1) + "K";
+    return n.toLocaleString();
+  };
+
+  const totalDocs = indices.reduce((acc, idx) => acc + parseInt(String(idx["docs.count"] || "0").replace(/,/g, ""), 10), 0);
+  
   const metaCards = [
-    { label: "Cluster Status", value: "Green", sub: "All nodes healthy", icon: ShieldIcon, valueColor: "text-emerald-600 dark:text-emerald-400", dot: true },
-    { label: "Active Shards",  value: "284",   sub: "0 unassigned",      icon: ActivityIcon, valueColor: isDark ? "text-slate-100" : "text-slate-900" },
-    { label: "Total Docs",     value: "6.3M",  sub: "Across 3 indices",  icon: DatabaseIcon, valueColor: isDark ? "text-slate-100" : "text-slate-900" },
+    { 
+      label: "Cluster Status", 
+      value: clusterData?.status ? clusterData.status.charAt(0).toUpperCase() + clusterData.status.slice(1) : (isLoading ? "Loading..." : "Unknown"), 
+      sub: clusterData ? "All nodes responding" : "Waiting for connection...", 
+      icon: ShieldIcon, 
+      valueColor: healthCfg.color, 
+      dot: true 
+    },
+    { 
+      label: "Active Shards",  
+      value: clusterData?.active_shards !== undefined ? clusterData.active_shards : (isLoading ? "..." : "0"),   
+      sub: clusterData?.unassigned_shards !== undefined ? `${clusterData.unassigned_shards} unassigned` : "Fetching shards...",      
+      icon: ActivityIcon, 
+      valueColor: "text-primary" 
+    },
+    { 
+      label: "Total Docs",     
+      value: formatNum(totalDocs),  
+      sub: `Across ${indices.length} indices`,  
+      icon: DatabaseIcon, 
+      valueColor: "text-primary" 
+    },
   ];
 
   return (
@@ -36,23 +122,19 @@ export default function ClusterHealthPage({ theme }) {
         {metaCards.map((c, i) => {
           const Icon = c.icon;
           return (
-            <div key={i} className={`metric-card flex flex-col gap-3 ${
-              isDark ? "bg-[#0c0c10] border-[#1e2130]" : "bg-white border-slate-200 shadow-sm"
-            }`}>
+            <div key={i} className="metric-card flex flex-col gap-3 bg-surface border-base border shadow-surface-sm">
               <div className="flex items-start justify-between">
-                <span className={`t-meta ${isDark ? "text-slate-500" : "text-slate-400"}`}>{c.label}</span>
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                  isDark ? "bg-[#111116]" : "bg-slate-100"
-                }`}>
+                <span className="t-meta text-secondary">{c.label}</span>
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-raised">
                   <Icon className={`w-4 h-4 ${isDark ? "text-indigo-400" : "text-indigo-600"}`} />
                 </div>
               </div>
               <div>
                 <p className={`flex items-center gap-2 text-2xl font-semibold tracking-tight mb-0.5 ${c.valueColor}`}>
-                  {c.dot && <span className={`w-2 h-2 rounded-full ${healthDot} flex-shrink-0`} />}
+                  {c.dot && <span className={`w-2 h-2 rounded-full ${healthCfg.dot} flex-shrink-0`} />}
                   {c.value}
                 </p>
-                <p className={`text-xs ${isDark ? "text-slate-500" : "text-slate-400"}`}>{c.sub}</p>
+                <p className="text-xs text-secondary">{c.sub}</p>
               </div>
             </div>
           );
@@ -60,52 +142,57 @@ export default function ClusterHealthPage({ theme }) {
       </div>
 
       {/* Nodes table */}
-      <div className={`table-panel mb-6 ${isDark ? "bg-[#0c0c10] border-[#1e2130]" : "bg-white border-slate-200 shadow-sm"}`}>
+      <div className="table-panel mb-6 bg-surface border-base border shadow-surface-sm">
         <div className="table-panel-header">
-          <h2 className={`table-panel-title ${isDark ? "text-slate-100" : "text-slate-900"}`}>
+          <h2 className="table-panel-title text-primary">
             <ServerIcon className="w-4 h-4 text-indigo-400" /> Connected Nodes
           </h2>
-          <span className="table-panel-badge">3 Active</span>
+          <span className="table-panel-badge">{nodes.length} Active</span>
         </div>
         <div className="table-scroll">
           <table>
             <caption className="sr-only">List of connected Elasticsearch cluster nodes and their resource metrics</caption>
             <thead>
               <tr>
-                {["Node Name", "IP Address", "Role", "CPU", "RAM", "Heap", "Docs", "Status"].map(h => (
+                {["Node Name", "IP Address", "Role", "CPU", "RAM", "Heap", "Status"].map(h => (
                   <th key={h} scope="col">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {nodes.map((n, i) => (
+              {nodes.length > 0 ? nodes.map((n, i) => (
                 <tr key={i}>
-                  <td className={`font-mono font-semibold ${isDark ? "text-slate-100" : "text-slate-900"}`}>{n.name}</td>
-                  <td className={`font-mono text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>{n.ip}</td>
-                  <td className={isDark ? "text-slate-400" : "text-slate-500"}>{n.role}</td>
+                  <td className="font-mono font-semibold text-primary">{n.name || "unknown"}</td>
+                  <td className="font-mono text-xs text-secondary">{n.ip || "-"}</td>
+                  <td className="text-secondary">{n["node.role"] === "m" || String(n.master) === "*" ? "Master" : (n["node.role"] ? "Data" : "Node")}</td>
                   <td className="font-mono text-xs">
-                    <span className={parseInt(n.cpu) > 70 ? "text-amber-500 font-semibold" : isDark ? "text-slate-300" : "text-slate-700"}>{n.cpu}</span>
+                    <span className={parseInt(n.cpu || "0") > 70 ? "text-amber-500 font-semibold" : "text-primary"}>{n.cpu ? `${n.cpu}%` : "-"}</span>
                   </td>
-                  <td className={`font-mono text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>{n.ram}</td>
-                  <td className={`font-mono text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>{n.heap}</td>
-                  <td className={`font-mono text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>{n.docs}</td>
+                  <td className="font-mono text-xs text-secondary">{n["ram.percent"] ? `${n["ram.percent"]}%` : "-"}</td>
+                  <td className="font-mono text-xs text-secondary">{n["heap.percent"] ? `${n["heap.percent"]}%` : "-"}</td>
                   <td>
                     <span className="node-status">
-                      <span className={`w-1.5 h-1.5 rounded-full ${healthDot}`} />
+                      <span className={`w-1.5 h-1.5 rounded-full bg-emerald-500`} />
                       Online
                     </span>
                   </td>
                 </tr>
-              ))}
+              )) : (
+                <tr>
+                  <td colSpan="7" className="text-center py-6 text-sm text-secondary">
+                    {isLoading ? "Fetching nodes..." : "No nodes found"}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
       </div>
 
       {/* Indices table */}
-      <div className={`table-panel ${isDark ? "bg-[#0c0c10] border-[#1e2130]" : "bg-white border-slate-200 shadow-sm"}`}>
+      <div className="table-panel bg-surface border-base border shadow-surface-sm">
         <div className="table-panel-header">
-          <h2 className={`table-panel-title ${isDark ? "text-slate-100" : "text-slate-900"}`}>
+          <h2 className="table-panel-title text-primary">
             <DatabaseIcon className="w-4 h-4 text-indigo-400" /> Index Overview
           </h2>
           <span className="table-panel-badge">{indices.length} Indices</span>
@@ -121,20 +208,34 @@ export default function ClusterHealthPage({ theme }) {
               </tr>
             </thead>
             <tbody>
-              {indices.map((idx, i) => (
+              {indices.length > 0 ? indices.map((idx, i) => (
                 <tr key={i}>
-                  <td className={`font-mono font-semibold ${isDark ? "text-slate-100" : "text-slate-900"}`}>{idx.name}</td>
+                  <td className="font-mono font-semibold text-primary">{idx.index}</td>
                   <td>
-                    <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 text-xs font-semibold">
-                      <span className={`w-1.5 h-1.5 rounded-full ${healthDot}`} />
+                    <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
+                      idx.health === "green" ? "text-emerald-600 dark:text-emerald-400" :
+                      idx.health === "yellow" ? "text-amber-600 dark:text-amber-400" :
+                      "text-rose-600 dark:text-rose-400"
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${
+                        idx.health === "green" ? "bg-emerald-500" :
+                        idx.health === "yellow" ? "bg-amber-500" :
+                        "bg-rose-500"
+                      }`} />
                       {idx.health}
                     </span>
                   </td>
-                  <td className={`font-mono text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>{idx.docs}</td>
-                  <td className={`font-mono text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>{idx.size}</td>
-                  <td className={`font-mono text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>{idx.shards}</td>
+                  <td className="font-mono text-xs text-secondary">{formatNum(idx["docs.count"] || idx.docs)}</td>
+                  <td className="font-mono text-xs text-secondary">{String(idx["store.size"] || "-").toUpperCase()}</td>
+                  <td className="font-mono text-xs text-secondary">{idx.pri || "0"}/{idx.rep || "0"}</td>
                 </tr>
-              ))}
+              )) : (
+                <tr>
+                  <td colSpan="5" className="text-center py-6 text-sm text-secondary">
+                    {isLoading ? "Fetching indices..." : "No visible indices found"}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

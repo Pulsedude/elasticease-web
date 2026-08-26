@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import { TerminalIcon, CheckIcon } from "./Icons";
 import ConsoleTerminal from "./ConsoleTerminal";
 
@@ -27,13 +27,13 @@ export default function ConsoleAppPage({ theme }) {
 
       <div className="feature-grid feature-grid-3 mt-5">
         {features.map((f, i) => (
-          <div key={i} className={`feature-card ${isDark ? "bg-[#0c0c10] border-[#1e2130]" : "bg-white border-slate-200 shadow-sm"}`}>
+          <div key={i} className="feature-card bg-surface border-base border shadow-surface-sm">
             <div className={`w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center ${isDark ? "bg-emerald-500/10" : "bg-emerald-50"}`}>
               <CheckIcon className="w-4 h-4 text-emerald-500" />
             </div>
             <div>
-              <h3 className={`text-[13px] font-semibold mb-1 ${isDark ? "text-slate-100" : "text-slate-900"}`}>{f.title}</h3>
-              <p className={`text-xs leading-relaxed ${isDark ? "text-slate-400" : "text-slate-500"}`}>{f.desc}</p>
+              <h3 className="text-[13px] font-semibold mb-1 text-primary">{f.title}</h3>
+              <p className="text-xs leading-relaxed text-secondary">{f.desc}</p>
             </div>
           </div>
         ))}
