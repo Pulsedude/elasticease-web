@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   TerminalIcon, DatabaseIcon, CpuIcon,
   ActivityIcon, ServerIcon, ChevronRightIcon, LayersIcon, ShieldIcon
@@ -237,88 +237,117 @@ export default function HomePage({ onNavigateToTab, theme }) {
   return (
     <div className="page-stack">
 
-{/* ── HERO PANEL ── */}
+      {/* ── HERO PANEL ── */}
       <div className="hero-panel">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+        <div className="hero-grid">
           {/* Left copy */}
-          <div className="flex flex-col justify-start min-w-0 space-y-5">
-            <div className={`inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full text-xs font-semibold w-fit border ${
-              isDark ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : "bg-emerald-50 border-emerald-200 text-emerald-700"
+          <div className="flex flex-col justify-center min-w-0">
+            <div className={`inline-flex items-center gap-2 h-7 px-3 rounded-full text-xs font-semibold leading-none w-fit border mb-4 ${
+              isDark ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-200" : "bg-emerald-100 border-emerald-300 text-emerald-800"
             }`}>
-              <span className={`w-2 h-2 rounded-full inline-block animate-pulse ${healthCfg.dot}`} />
-              {clusterData?.cluster_name || "elasticease-production"} &middot; connected
+              <span className={`w-2 h-2 rounded-full inline-block animate-pulse flex-shrink-0 ${healthCfg.dot}`} />
+              <span className="flex items-center gap-1.5 leading-none">
+                <span>{clusterData?.cluster_name || "elasticease-production"}</span>
+                <span className="opacity-50">&middot;</span>
+                <span>connected</span>
+              </span>
             </div>
 
-            <h1 className={`t-page-title ${isDark ? "text-slate-100" : "text-slate-900"}`}>
+            <h1 className={`text-2xl sm:text-3xl lg:text-[2.25rem] font-bold tracking-tight leading-[1.18] mb-3.5 ${isDark ? "text-slate-100" : "text-slate-900"}`}>
               Elasticsearch management,<br />
               <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-400">
                 simplified.
               </span>
             </h1>
 
-            <p className={`t-body max-w-xl ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+            <p className={`text-sm sm:text-[15px] leading-relaxed max-w-lg mb-5 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
               A high-performance platform to monitor, query, and orchestrate your Elasticsearch nodes with maximum clarity.
             </p>
 
-            <div className="flex flex-wrap items-center gap-3 pt-1">
+            <div className="flex flex-wrap items-center gap-3">
               <button
-                onClick={() => onNavigateToTab("console")} type="button"
-                className="flex items-center gap-2.5 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all text-white shadow-sm cursor-pointer"
+                onClick={() => onNavigateToTab("console")}
+                type="button"
+                className="inline-flex items-center justify-center gap-2.5 h-10 px-5 rounded-xl font-semibold text-sm leading-none text-white border border-transparent shadow-sm transition-all cursor-pointer"
                 style={{ background: 'var(--accent)' }}
                 onMouseEnter={e => e.currentTarget.style.background = 'var(--accent-hover)'}
                 onMouseLeave={e => e.currentTarget.style.background = 'var(--accent)'}
               >
-                <TerminalIcon className="w-4 h-4 flex-shrink-0" /> Open Console <ChevronRightIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                <TerminalIcon className="w-4 h-4 flex-shrink-0" />
+                <span className="leading-none">Open Console</span>
+                <ChevronRightIcon className="w-3.5 h-3.5 flex-shrink-0 opacity-80" />
               </button>
               <button
-                onClick={() => onNavigateToTab("cluster")} type="button"
-                className={`flex items-center gap-2.5 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all border cursor-pointer ${
-                  isDark ? "border-[#1e2130] text-slate-300 hover:bg-[#1e2130] hover:text-slate-100" : "border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+                onClick={() => onNavigateToTab("cluster")}
+                type="button"
+                className={`inline-flex items-center justify-center gap-2.5 h-10 px-5 rounded-xl font-semibold text-sm leading-none transition-all border cursor-pointer ${
+                  isDark ? "border-[#1e2130] bg-[#0c0c10]/40 text-slate-300 hover:bg-[#1e2130] hover:text-slate-100" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900"
                 }`}
               >
-                <ActivityIcon className="w-4 h-4 flex-shrink-0" /> View Infrastructure
+                <ActivityIcon className="w-4 h-4 flex-shrink-0" />
+                <span className="leading-none">View Infrastructure</span>
               </button>
             </div>
           </div>
 
           {/* Right: cluster visualization */}
-          <div className="w-full min-w-0">
-            <div className={`rounded-xl border overflow-hidden ${isDark ? "bg-[#111116] border-[#1e2130]" : "bg-slate-50 border-slate-200"}`}>
-              <div className={`px-4 py-2.5 flex items-center gap-3 border-b ${isDark ? "bg-[#0c0c10] border-[#1e2130]" : "bg-white border-slate-200"}`}>
-                <div className="flex gap-1.5" aria-hidden="true">
-                  <span className="w-3 h-3 rounded-full bg-red-500" />
-                  <span className="w-3 h-3 rounded-full bg-amber-400" />
-                  <span className="w-3 h-3 rounded-full bg-green-500" />
+          <div className="w-full min-w-0 flex flex-col justify-center">
+            <div className={`w-full rounded-xl border overflow-hidden shadow-sm transition-all ${isDark ? "bg-[#111116] border-[#1e2130]" : "bg-slate-50 border-slate-200"}`}>
+              <div className={`px-4 py-2.5 flex items-center justify-between border-b ${isDark ? "bg-[#0c0c10] border-[#1e2130]" : "bg-white border-slate-200"}`}>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5" aria-hidden="true">
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                  </div>
+                  <span className={`ml-1.5 text-xs font-mono font-medium leading-none ${isDark ? "text-slate-400" : "text-slate-500"}`}>cluster-topology</span>
                 </div>
-                <span className={`ml-1 text-xs font-mono truncate ${isDark ? "text-slate-500" : "text-slate-400"}`}>cluster-topology</span>
+                <span className={`inline-flex items-center h-5 px-2 rounded text-[11px] font-mono font-medium border leading-none ${isDark ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-emerald-50 text-emerald-700 border-emerald-200"}`}>
+                  3 nodes active
+                </span>
               </div>
-              <div className="p-3 flex flex-col gap-2.5">
+              <div className="p-3 flex flex-col gap-2">
                 {topologyNodes.map((n) => (
-                  <div key={n.name} className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
-                    isDark ? "border-[#1e2130] hover:bg-[#1e2130]/50" : "border-slate-200 hover:bg-slate-100"
+                  <div key={n.name} className={`flex items-center justify-between h-[54px] px-3 rounded-lg border transition-colors ${
+                    isDark ? "bg-[#0c0c10]/60 border-[#1e2130] hover:bg-[#1e2130]/50" : "bg-white border-slate-200 hover:bg-slate-100/80"
                   }`}>
-                    <div className="flex items-center gap-3 min-w-0">
-                      <ServerIcon className="w-4 h-4 flex-shrink-0 text-indigo-400" />
-                      <div className="min-w-0">
-                        <div className={`text-sm font-mono truncate ${isDark ? "text-slate-100" : "text-slate-900"}`}>{n.name}</div>
-                        <div className={`text-xs font-mono ${isDark ? "text-slate-500" : "text-slate-400"}`}>{n.ip}</div>
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      <div className={`w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 border ${
+                        isDark ? "bg-indigo-500/10 border-indigo-500/20 text-indigo-400" : "bg-indigo-50 border-indigo-200 text-indigo-600"
+                      }`}>
+                        <ServerIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                      </div>
+                      <div className="flex flex-col justify-center min-w-0">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className={`text-xs sm:text-[13px] font-mono font-medium truncate leading-none ${isDark ? "text-slate-100" : "text-slate-900"}`}>{n.name}</span>
+                          {n.master && (
+                            <span className={`inline-flex items-center h-3.5 px-1 rounded text-[9px] font-mono font-semibold uppercase tracking-wide leading-none flex-shrink-0 ${
+                              isDark ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30" : "bg-indigo-100 text-indigo-700 border border-indigo-200"
+                            }`}>
+                              master
+                            </span>
+                          )}
+                        </div>
+                        <span className={`text-[11px] font-mono leading-none mt-1 ${isDark ? "text-slate-500" : "text-slate-400"}`}>{n.ip}</span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 flex-shrink-0">
-                      <div className="text-right">
-                        <div className={`text-xs ${isDark ? "text-slate-500" : "text-slate-400"}`}>CPU</div>
-                        <div className={`text-sm font-mono ${isDark ? "text-slate-100" : "text-slate-900"}`}>{n.cpu}</div>
+                    <div className="flex items-center gap-3 flex-shrink-0 ml-2">
+                      <div className="flex flex-col items-end justify-center min-w-[40px]">
+                        <span className={`text-[10px] font-semibold tracking-wider uppercase leading-none ${isDark ? "text-slate-500" : "text-slate-400"}`}>CPU</span>
+                        <span className={`text-xs sm:text-[13px] font-mono font-semibold tabular-nums leading-none mt-1 ${isDark ? "text-slate-100" : "text-slate-900"}`}>{n.cpu}</span>
                       </div>
-                      <span className={`w-2.5 h-2.5 rounded-full ${healthCfg.dot}`} />
+                      <div className="w-2.5 h-2.5 flex items-center justify-center flex-shrink-0">
+                        <span className={`w-2 h-2 rounded-full inline-block ${healthCfg.dot || "bg-emerald-500"}`} />
+                      </div>
                     </div>
                   </div>
                 ))}
-                <div className={`px-3 py-2.5 rounded-lg flex items-center justify-between text-xs font-mono border ${
+                <div className={`h-8 px-3 rounded-lg flex items-center justify-between text-xs font-mono border ${
                   isDark ? "bg-[#0c0c10] border-[#1e2130]" : "bg-white border-slate-200"
                 }`}>
-                  <span className={isDark ? "text-slate-400" : "text-slate-500"}>active_shards</span>
-                  <span className="font-mono text-emerald-500 font-semibold">
-                    284 / 284
+                  <span className={`leading-none ${isDark ? "text-slate-400" : "text-slate-500"}`}>active_shards</span>
+                  <span className="font-mono text-emerald-500 font-semibold leading-none">
+                    {clusterData?.active_shards !== undefined ? `${clusterData.active_shards} / ${clusterData.active_shards}` : "60 / 60"}
                   </span>
                 </div>
               </div>
