@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 import logging
+import config
 import time
 import psutil
 from pathlib import Path
@@ -25,6 +26,8 @@ print(parent_directory)
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s', filemode='a', filename=f"./{parent_directory}/log/api.log")
 logger = logging.getLogger(__name__)
 
+# read configuration 
+configuration = config.read()
 
 # middleware for logging
 @app.middleware("http")
@@ -50,18 +53,10 @@ async def logging_middleware(request: Request, call_next):
 
 
 # CORS middleware to allow frontend communication
+allow_origins = ["*"] if isinstance(configuration, tuple) else configuration.get("elasticease_web").get("backend").get("allow_origins")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:5174",
-        "http://127.0.0.1:5174",
-        "http://localhost:5175",
-        "http://127.0.0.1:5175",
-        "http://localhost:5176",
-        "http://127.0.0.1:5176",
-    ],
+    allow_origins=allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
