@@ -2,8 +2,9 @@ from fastapi import APIRouter, HTTPException, status, Response
 from core_operations import CoreOps
 from .models import (
     LoginCredentials,
+    AIInferenceUpdate,
 )
-
+import config
 import json
 
 router = APIRouter(prefix="/v1/core")
@@ -167,3 +168,70 @@ def see_all_indices(ai_response: bool = False):
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": str(e)})
+
+
+@router.get("/ai_config", status_code=status.HTTP_200_OK)
+def get_ai_configuration():
+    """Return current selected AI inference provider and config from config.yaml"""
+    try:
+        cfg = config.read()
+        if isinstance(cfg, tuple):
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": cfg[1]})
+        
+        web_cfg = cfg.get("elasticease_web", {}) if isinstance(cfg, dict) else {}
+        return {
+            "success": True,
+            "selected_ai_inference": web_cfg.get("selected_ai_inference", "ollama"),
+            "ai_mode": web_cfg.get("ai_mode", True),
+            "model_providers": web_cfg.get("model_providers", {})
+        }
+    except HTTPException:
+        raise
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": str(e)})
+
+
+@router.post("/ai_inference", status_code=status.HTTP_200_OK)
+def update_ai_inference(body: AIInferenceUpdate):
+    """Update selected AI inference provider in config.yaml and active session"""
+    try:
+        cfg = config.read()
+        if isinstance(cfg, tuple):
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": cfg[1]})
+
+        if "elasticease_web" not in cfg:
+            cfg["elasticease_web"] = {}
+
+        provider = body.provider.lower().strip()
+        if provider not in ["ollama", "litellm"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"error": "Invalid AI inference provider. Must be 'ollama' or 'litellm'."}
+            )
+
+        cfg["elasticease_web"]["selected_ai_inference"] = provider
+        if body.ai_mode is not None:
+            cfg["elasticease_web"]["ai_mode"] = body.ai_mode
+
+        write_res = config.write(cfg)
+        if isinstance(write_res, tuple) and not write_res[0]:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": write_res[1]})
+
+        coreops.selected_ai_inference = provider
+        if body.ai_mode is not None:
+            coreops.ai_mode = body.ai_mode
+
+        return {
+            "success": True,
+            "selected_ai_inference": provider,
+            "message": f"Successfully switched AI inference to {provider}"
+        }
+    except HTTPException:
+        raise
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": str(e)})
+
