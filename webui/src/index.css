@@ -95,6 +95,7 @@ html, body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-size: 14px;
+  overflow-x: hidden;
 }
 
 #root {
@@ -136,6 +137,7 @@ img, video, svg { max-width: 100%; display: block; }
   width: 100%;
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
   background: var(--bg-base);
   color: var(--text-primary);
 }
@@ -334,11 +336,18 @@ img, video, svg { max-width: 100%; display: block; }
 .hero-panel {
   position: relative;
   overflow: hidden;
-  margin-bottom: 32px;
-  padding: 40px;
+  margin-bottom: 24px;
   border-radius: 16px;
   border: 1px solid var(--border);
   background: var(--bg-surface);
+}
+
+.hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 480px);
+  align-items: center;
+  gap: 40px;
+  padding: 32px 36px;
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -643,9 +652,11 @@ img, video, svg { max-width: 100%; display: block; }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    PROFILE MENU
+   IMPORTANT: All rules scoped under .profile-wrapper
+   to prevent CSS leakage into other components.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
-.profile-wrapper { position: relative; }
-.profile-trigger {
+.profile-wrapper { /* position: static by default — no stacking context */ }
+.profile-wrapper .profile-trigger {
   display: flex; align-items: center;
   gap: 8px;
   min-height: 36px;
@@ -656,50 +667,127 @@ img, video, svg { max-width: 100%; display: block; }
   background: var(--bg-surface);
   transition: background-color 160ms ease, border-color 160ms ease;
 }
-.profile-trigger:hover { background: var(--bg-raised); }
+.profile-wrapper .profile-trigger:hover { background: var(--bg-raised); }
 
-.profile-menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 50;
-  width: min(340px, calc(100vw - 24px));
-  border-radius: 14px;
+/* Dropdown floats above header & dashboard.
+   Uses fixed positioning + JS-computed coords so it escapes the
+   .app-header stacking context cleanly without negative margins. */
+.profile-wrapper .profile-menu {
+  position: fixed;
+  z-index: 9999;
+  width: 320px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  border-radius: 12px;
   background: var(--bg-surface);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-lg);
-  overflow: hidden;
+  pointer-events: auto;
 }
 
-.profile-menu-header { padding: 16px 18px; border-bottom: 1px solid var(--border); }
-.profile-menu-meta   { padding: 14px 18px; border-bottom: 1px solid var(--border); }
-.profile-meta-row {
+/* Internal layout — fully self-contained, never targets generic tags. */
+.profile-wrapper .profile-menu-header {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.profile-wrapper .profile-menu-meta {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.profile-wrapper .profile-meta-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-  margin-bottom: 8px;
+  min-height: 26px;
+  margin-bottom: 6px;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 11.5px;
 }
-.profile-meta-row:last-child { margin-bottom: 0; }
-.profile-meta-row code {
+.profile-wrapper .profile-meta-row:last-child { margin-bottom: 0; }
+.profile-wrapper .profile-meta-row > span:first-child {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex-shrink: 1;
+}
+.profile-wrapper .profile-meta-row > code,
+.profile-wrapper .profile-meta-row > span:last-child {
+  flex-shrink: 0;
   max-width: 160px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11.5px;
+  font-size: 11px;
   color: var(--text-secondary);
 }
 
-.profile-avatar {
-  width: 40px; height: 40px;
-  flex: 0 0 40px;
+.profile-wrapper .profile-avatar {
+  width: 36px; height: 36px;
+  flex: 0 0 36px;
   display: flex; align-items: center; justify-content: center;
-  border-radius: 10px;
+  border-radius: 9px;
   color: #fff;
   font-weight: 700;
-  font-size: 15px;
+  font-size: 14px;
+}
+
+/* AI inference selector — scoped to profile dropdown to avoid collisions. */
+.profile-wrapper .profile-ai-section {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.profile-wrapper .profile-ai-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  min-width: 0;
+}
+.profile-wrapper .profile-ai-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+  width: 100%;
+  padding: 8px 9px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+.profile-wrapper .profile-ai-option:hover {
+  background: var(--bg-raised);
+}
+.profile-wrapper .profile-ai-option-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 4px;
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace;
+}
+.profile-wrapper .profile-ai-option-model {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  font-size: 9px;
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-wrapper .profile-signout {
+  padding: 10px 14px;
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -857,6 +945,11 @@ img, video, svg { max-width: 100%; display: block; }
   .feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .stat-grid-3  { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .feature-grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hero-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+    gap: 28px;
+    padding: 28px 24px;
+  }
 }
 
 /* ── SM: 768px ── */
@@ -875,10 +968,16 @@ img, video, svg { max-width: 100%; display: block; }
   .settings-actions { justify-content: stretch; }
   .settings-actions button { width: 100%; min-width: unset; }
   .profile-menu { position: fixed; top: 60px; right: 12px; left: 12px; width: auto; }
+  .profile-wrapper .profile-menu { top: 60px; right: 12px; left: 12px; width: auto; }
   /* Backend banner: stack vertically on tablet */
   .backend-banner { flex-direction: column; align-items: flex-start; }
   .backend-config-button { width: 100%; }
-  .hero-panel { padding: 28px 20px; }
+  .hero-panel { margin-bottom: 20px; }
+  .hero-grid {
+    grid-template-columns: 1fr;
+    gap: 24px;
+    padding: 24px 20px;
+  }
 }
 
 /* ── XS: 520px ── */
@@ -897,7 +996,7 @@ img, video, svg { max-width: 100%; display: block; }
     padding: 16px 12px 40px;
   }
   .settings-card { padding: 20px 16px; }
-  .hero-panel { padding: 20px 16px; }
+  .hero-grid { padding: 20px 16px; }
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
