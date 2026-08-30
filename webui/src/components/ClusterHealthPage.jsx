@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { ServerIcon, ActivityIcon, ShieldIcon, DatabaseIcon } from "./Icons";
 
+// Backend API Base URL from Vite config (config.yaml)
+const API_BASE_URL = typeof __API_BASE_URL__ !== "undefined"
+  ? __API_BASE_URL__
+  : (typeof __BACKEND_BASE_URL__ !== "undefined" ? __BACKEND_BASE_URL__ : "http://localhost:8000");
+
 export default function ClusterHealthPage({ theme }) {
   const isDark = theme === "dark";
-
-  // Backend config from Vite define
-  const BACKEND_HOST = typeof __BACKEND_HOST__ !== 'undefined' ? __BACKEND_HOST__ : '127.0.0.1';
-  const BACKEND_PORT = typeof __BACKEND_PORT__ !== 'undefined' ? __BACKEND_PORT__ : '8000';
-  const API_BASE_URL = `http://${BACKEND_HOST}:${BACKEND_PORT}`;
 
   const [isLoading, setIsLoading] = useState(true);
   const [nodes, setNodes] = useState([]);

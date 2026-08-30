@@ -6,8 +6,11 @@ import {
   SparklesIcon, CheckIcon, CpuIcon
 } from "./Icons";
 
-// ES host from config.yaml (injected by vite.config.js)
-const ES_BASE_URL = typeof __ES_BASE_URL__ !== "undefined" ? __ES_BASE_URL__ : "https://127.0.0.1:9200";
+// Configs from config.yaml (injected by vite.config.js)
+const API_BASE_URL = typeof __API_BASE_URL__ !== "undefined"
+  ? __API_BASE_URL__
+  : (typeof __BACKEND_BASE_URL__ !== "undefined" ? __BACKEND_BASE_URL__ : "http://localhost:8000");
+const ES_BASE_URL = typeof __ES_BASE_URL__ !== "undefined" ? __ES_BASE_URL__ : "http://localhost:9200";
 const DEFAULT_AI_INFERENCE = typeof __SELECTED_AI_INFERENCE__ !== "undefined" ? __SELECTED_AI_INFERENCE__ : "ollama";
 const OLLAMA_MODEL = typeof __OLLAMA_MODEL__ !== "undefined" ? __OLLAMA_MODEL__ : "gpt-oss:120b-cloud";
 const LITELLM_MODEL = typeof __LITELLM_MODEL__ !== "undefined" ? __LITELLM_MODEL__ : "gemini/gemini-3-flash-preview";
@@ -18,7 +21,7 @@ function parseEsHost(url) {
     const u = new URL(url);
     return u.host; // e.g. "127.0.0.1:9200"
   } catch {
-    return url.replace(/^https?:\/\//, "").replace(/\/$/, "");
+    return (url || "").replace(/^https?:\/\//, "").replace(/\/$/, "");
   }
 }
 
@@ -29,10 +32,6 @@ function healthLabel(status) {
   if (s === "red")    return { label: "Red",     color: "text-rose-400",    dot: "bg-rose-400"    };
   return                     { label: "Checking…", color: "text-slate-400", dot: "bg-slate-400"   };
 }
-
-const BACKEND_HOST = typeof __BACKEND_HOST__ !== "undefined" ? __BACKEND_HOST__ : "127.0.0.1";
-const BACKEND_PORT = typeof __BACKEND_PORT__ !== "undefined" ? __BACKEND_PORT__ : "8000";
-const API_BASE_URL = `http://${BACKEND_HOST}:${BACKEND_PORT}`;
 
 export default function Navbar({ user, onLogout, theme, toggleTheme, onOpenDrawer, clusterHealth }) {
   const [profileOpen, setProfileOpen] = useState(false);
@@ -77,7 +76,7 @@ export default function Navbar({ user, onLogout, theme, toggleTheme, onOpenDrawe
     localStorage.setItem("elasticease_selected_ai_inference", provider);
     try {
       await fetch(`${API_BASE_URL}/v1/core/ai_inference`, {
-        method: "POST",
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ provider }),
       });
@@ -223,7 +222,6 @@ export default function Navbar({ user, onLogout, theme, toggleTheme, onOpenDrawe
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className={`font-semibold text-[13px] truncate leading-tight ${isDark ? "text-slate-100" : "text-slate-900"}`}>{user?.name || "admin"}</p>
-                      <p className={`text-[11px] truncate leading-tight mt-0.5 ${isDark ? "text-slate-500" : "text-slate-400"}`}>{user?.email || `${(user?.name || "admin").toLowerCase()}@elasticease.io`}</p>
                       <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border leading-none ${isDark ? "bg-indigo-500/10 text-indigo-300 border-indigo-500/25" : "bg-indigo-50 text-indigo-700 border-indigo-200"}`}>
                         {user?.role || "Cluster Administrator"}
                       </span>
@@ -276,7 +274,6 @@ export default function Navbar({ user, onLogout, theme, toggleTheme, onOpenDrawe
                       Select AI Inference
                     </span>
                     <span className="text-[9px] font-mono text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded flex-shrink-0 leading-none">
-                      config.yaml
                     </span>
                   </div>
                   <div className="profile-ai-grid">

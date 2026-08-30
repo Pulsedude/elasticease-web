@@ -9,17 +9,17 @@ import {
   ChevronRightIcon,
 } from "./Icons";
 
+// Backend API Base URL from Vite config (config.yaml)
+const API_BASE_URL = typeof __API_BASE_URL__ !== "undefined"
+  ? __API_BASE_URL__
+  : (typeof __BACKEND_BASE_URL__ !== "undefined" ? __BACKEND_BASE_URL__ : "http://localhost:8000");
+
 export default function LoginModal({ onLoginSuccess }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
-
-  // Get backend config from Vite define (set in vite.config.js from config.yaml)
-  const BACKEND_HOST = typeof __BACKEND_HOST__ !== 'undefined' ? __BACKEND_HOST__ : '127.0.0.1';
-  const BACKEND_PORT = typeof __BACKEND_PORT__ !== 'undefined' ? __BACKEND_PORT__ : '8000';
-  const API_BASE_URL = `http://${BACKEND_HOST}:${BACKEND_PORT}`;
 
   const handleSubmit = async (e) => {
     e.preventDefault();

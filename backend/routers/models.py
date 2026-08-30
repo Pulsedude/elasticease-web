@@ -12,3 +12,7 @@ class AIInferenceUpdate(BaseModel):
     provider: str
     ai_mode: Optional[bool] = None
 
+
+class URLUpdate(BaseModel):
+    model_config = ConfigDict(strict=True)
+    base_url: str

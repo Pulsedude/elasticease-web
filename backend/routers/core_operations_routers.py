@@ -3,6 +3,7 @@ from core_operations import CoreOps
 from .models import (
     LoginCredentials,
     AIInferenceUpdate,
+    URLUpdate
 )
 import config
 import json
@@ -31,7 +32,7 @@ def see_latency_of_api():
             )
 
         return elasticsearch_api_latency
-    
+
     except HTTPException:
         raise
 
@@ -120,8 +121,8 @@ def see_total_number_of_available_shards():
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": str(e)})
-        
-        
+
+
 @router.get("/nodes", status_code=status.HTTP_200_OK)
 def see_total_number_active_nodes(ai_response: bool = False):
     """Return to total number of active nodes running on cluster
@@ -144,8 +145,8 @@ def see_total_number_active_nodes(ai_response: bool = False):
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": str(e)})
-        
-        
+
+
 @router.get("/indices", status_code=status.HTTP_200_OK)
 def see_all_indices(ai_response: bool = False):
     """Return the total number indices on active nodes 
@@ -175,10 +176,13 @@ def get_ai_configuration():
     """Return current selected AI inference provider and config from config.yaml"""
     try:
         cfg = config.read()
-        if isinstance(cfg, tuple):
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": cfg[1]})
         
-        web_cfg = cfg.get("elasticease_web", {}) if isinstance(cfg, dict) else {}
+        if isinstance(cfg, tuple):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": cfg[1]})
+
+        web_cfg = cfg.get("elasticease_web", {}
+                          ) if isinstance(cfg, dict) else {}
         return {
             "success": True,
             "selected_ai_inference": web_cfg.get("selected_ai_inference", "ollama"),
@@ -187,28 +191,31 @@ def get_ai_configuration():
         }
     except HTTPException:
         raise
-    
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": str(e)})
 
 
-@router.post("/ai_inference", status_code=status.HTTP_200_OK)
+@router.put("/ai_inference", status_code=status.HTTP_200_OK)
 def update_ai_inference(body: AIInferenceUpdate):
     """Update selected AI inference provider in config.yaml and active session"""
     try:
         cfg = config.read()
         if isinstance(cfg, tuple):
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": cfg[1]})
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": cfg[1]})
 
         if "elasticease_web" not in cfg:
             cfg["elasticease_web"] = {}
 
         provider = body.provider.lower().strip()
+        
         if provider not in ["ollama", "litellm"]:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"error": "Invalid AI inference provider. Must be 'ollama' or 'litellm'."}
+                detail={
+                    "error": "Invalid AI inference provider. Must be 'ollama' or 'litellm'."}
             )
 
         cfg["elasticease_web"]["selected_ai_inference"] = provider
@@ -217,7 +224,8 @@ def update_ai_inference(body: AIInferenceUpdate):
 
         write_res = config.write(cfg)
         if isinstance(write_res, tuple) and not write_res[0]:
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": write_res[1]})
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={
+                                "error": write_res[1]})
 
         coreops.selected_ai_inference = provider
         if body.ai_mode is not None:
@@ -230,8 +238,89 @@ def update_ai_inference(body: AIInferenceUpdate):
         }
     except HTTPException:
         raise
-    
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": str(e)})
 
+
+@router.put("/update_elastic_url", status_code=status.HTTP_200_OK)
+def update_elastic_base_url(body: URLUpdate):
+    """Update existing Elasticsearch request URL with new Base URL 
+    """
+    try:
+        cfg = config.read()
+
+        if isinstance(cfg, tuple):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": cfg[1]})
+
+        new_base_url = body.base_url
+        
+        if not new_base_url.startswith(("http://", "https://")):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail={
+                    "error": "Please provide a valid URL!"}
+            )
+
+        cfg["elasticease_web"]["elasticsearch"]["base_url"] = new_base_url
+
+        # write back to configurations
+        write_cfg = config.write(cfg)
+        if isinstance(write_cfg, tuple):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": write_cfg[1]})
+        
+        return {
+            "success": True,
+            "elastic url": new_base_url,
+            "message": "successfully updated!"
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": str(e)})
+        
+        
+@router.put("/update_backend_url", status_code=status.HTTP_200_OK)
+def update_backend_base_url(body: URLUpdate):
+    """Update existing backend API base url with new base URL
+    """
+    try:
+        cfg = config.read()
+
+        if isinstance(cfg, tuple):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": cfg[1]})
+
+        new_base_url = body.base_url
+        
+        if not new_base_url.startswith(("http://", "https://")):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail={
+                    "error": "Please provide a valid URL!"}
+            )
+
+        cfg["elasticease_web"]["backend"]["base_url"] = new_base_url
+
+        # write back to configurations
+        write_cfg = config.write(cfg)
+        if isinstance(write_cfg, tuple):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": write_cfg[1]})
+        
+        return {
+            "success": True,
+            "backend url": new_base_url,
+            "message": "successfully updated!"
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": str(e)})

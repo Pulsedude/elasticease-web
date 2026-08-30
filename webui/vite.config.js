@@ -25,10 +25,12 @@ export default defineConfig({
   },
   define: {
     // Expose backend config to frontend
-    __BACKEND_HOST__: JSON.stringify(config.elasticease_web.backend.host),
-    __BACKEND_PORT__: JSON.stringify(config.elasticease_web.backend.port),
+    __BACKEND_HOST__: JSON.stringify(config.elasticease_web?.backend?.host || '127.0.0.1'),
+    __BACKEND_PORT__: JSON.stringify(config.elasticease_web?.backend?.port || '8000'),
+    __BACKEND_BASE_URL__: JSON.stringify(config.elasticease_web?.backend?.base_url || 'http://127.0.0.1:8000'),
+    __API_BASE_URL__: JSON.stringify(config.elasticease_web?.backend?.base_url || `http://${config.elasticease_web?.backend?.host || '127.0.0.1'}:${config.elasticease_web?.backend?.port || '8000'}`),
     __FRONTEND_BOOT_ID__: JSON.stringify(frontendBootId),
-    __ES_BASE_URL__: JSON.stringify(config.elasticease_web.elasticsearch.base_url),
+    __ES_BASE_URL__: JSON.stringify(config.elasticease_web?.elasticsearch?.base_url || 'http://localhost:9200'),
     __SELECTED_AI_INFERENCE__: JSON.stringify(config.elasticease_web?.selected_ai_inference || 'ollama'),
     __AI_MODE__: JSON.stringify(config.elasticease_web?.ai_mode ?? true),
     __OLLAMA_MODEL__: JSON.stringify(config.elasticease_web?.model_providers?.ollama?.model || 'gpt-oss:120b-cloud'),
