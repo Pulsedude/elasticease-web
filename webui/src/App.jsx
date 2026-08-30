@@ -10,6 +10,10 @@ import SettingsPage from "./components/SettingsPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import NotFoundPage from "./components/NotFoundPage";
 
+const API_BASE_URL = typeof __API_BASE_URL__ !== "undefined"
+  ? __API_BASE_URL__
+  : (typeof __BACKEND_BASE_URL__ !== "undefined" ? __BACKEND_BASE_URL__ : "http://localhost:8000");
+
 const AUTH_USER_KEY = "elasticease_session_user";
 const AUTH_BOOT_KEY = "elasticease_frontend_boot_id";
 const FRONTEND_BOOT_ID = typeof __FRONTEND_BOOT_ID__ !== "undefined"
@@ -40,10 +44,6 @@ function AppContent() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [clusterHealth, setClusterHealth] = useState(null);
 
-  const BACKEND_HOST = typeof __BACKEND_HOST__ !== "undefined" ? __BACKEND_HOST__ : "127.0.0.1";
-  const BACKEND_PORT = typeof __BACKEND_PORT__ !== "undefined" ? __BACKEND_PORT__ : "8000";
-  const API_BASE_URL = `http://${BACKEND_HOST}:${BACKEND_PORT}`;
-
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -67,7 +67,7 @@ function AppContent() {
     fetchHealth();
     const id = setInterval(fetchHealth, 15_000);
     return () => { active = false; clearInterval(id); };
-  }, [user, API_BASE_URL]);
+  }, [user]);
 
   const toggleTheme = () => setTheme(prev => prev === "dark" ? "light" : "dark");
 
