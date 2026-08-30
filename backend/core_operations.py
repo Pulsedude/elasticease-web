@@ -1,4 +1,4 @@
-from config import read, write
+from config import read
 import requests
 import urllib3
 import time
@@ -168,7 +168,7 @@ class CoreOps:
 
                 # ask AI-Model
                 ai_response = self.ask_ai(
-                    f"{response.get("response")}\n\nHere is the cluster health of active elasticsearch cluster. So please explain meaning of each field in this given data. Start from direct explanation.")
+                    f"{response.get('response')}\n\nHere is the cluster health of active elasticsearch cluster. So please explain meaning of each field in this given data. Start from direct explanation.")
 
                 if isinstance(ai_response, tuple):
                     return {
@@ -209,7 +209,7 @@ class CoreOps:
 
                 # ask AI-Model
                 ai_response = self.ask_ai(
-                    f"{response.get("response")}\n\nHere is the all available active shards on my elasticsearch node now can you please explain detail of each shard according to their data. Start directly from explaining.")
+                    f"{response.get('response')}\n\nHere is the all available active shards on my elasticsearch node now can you please explain detail of each shard according to their data. Start directly from explaining.")
 
                 if isinstance(ai_response, tuple):
                     return {
@@ -250,7 +250,7 @@ class CoreOps:
 
                 # ask AI-Model
                 ai_response = self.ask_ai(
-                    f"{response.get("response")}\n\nHere is the all available active indices on my elasticsearch node now please start explaining the each index data according to their data in details. Start directly from explaining.")
+                    f"{response.get('response')}\n\nHere is the all available active indices on my elasticsearch node now please start explaining the each index data according to their data in details. Start directly from explaining.")
 
                 if isinstance(ai_response, tuple):
                     return {
@@ -292,7 +292,7 @@ class CoreOps:
 
                 # ask AI-Model
                 ai_response = self.ask_ai(
-                    f"{response.get("response")}\n\nHere is the all active nodes running on elasticsearch cluster now please can you provide better explaination according to all active nodes data which is more understandable. (start direclty from explaination)")
+                    f"{response.get('response')}\n\nHere is the all active nodes running on elasticsearch cluster now please can you provide better explaination according to all active nodes data which is more understandable. (start direclty from explaination)")
 
                 if isinstance(ai_response, tuple):
                     return {
