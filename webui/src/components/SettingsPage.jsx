@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { SettingsIcon, CheckIcon, ServerIcon } from "./Icons";
+import BackButton from "./BackButton";
 
 // Configs from config.yaml (injected by vite.config.js)
 const API_BASE_URL = typeof __API_BASE_URL__ !== "undefined"
@@ -109,6 +110,9 @@ export default function SettingsPage({ theme }) {
   return (
     <div className="settings-page">
       <div className="page-heading">
+        <div className="page-heading-nav">
+          <BackButton />
+        </div>
         <h1 className="flex items-center gap-2.5">
           <SettingsIcon className={`w-6 h-6 ${isDark ? "text-indigo-400" : "text-indigo-600"}`} />
           Connection Settings

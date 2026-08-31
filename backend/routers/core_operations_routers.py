@@ -77,11 +77,11 @@ def authorization(credentials: LoginCredentials):
 
 
 @router.get("/cluster_status", status_code=status.HTTP_200_OK)
-def to_check_the_active_cluster_status(ai_response: bool = False):
+def to_check_the_active_cluster_status():
     """Return the health & details of active cluster
     """
     try:
-        cluster_health = coreops.check_cluster_status(ai_response)
+        cluster_health = coreops.check_cluster_status()
 
         if cluster_health.get("success") is False:
             raise HTTPException(

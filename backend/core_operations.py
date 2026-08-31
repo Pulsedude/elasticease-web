@@ -85,6 +85,9 @@ class CoreOps:
 
             url = f"{self.elastic_base_url.rstrip('/')}/{path.lstrip('/')}" if path else self.elastic_base_url.rstrip(
                 '/')
+
+            start = time.perf_counter()
+
             response = requests.get(
                 url,
                 timeout=10,
@@ -92,10 +95,12 @@ class CoreOps:
                 verify=self.verify_certs
             )
 
+            end = time.perf_counter()
+
             if response.status_code == 401:
                 return {"success": False, "status": "alive", "response": "failed to authorize"}
 
-            return {"success": True, "status": "alive", "response": response.json()}
+            return {"success": True, "status": "alive", "response": response.json(), "latency": f"{((end - start) * 1000):.3f}"}
         except Exception as e:
             return {
                 "success": False,
@@ -149,38 +154,11 @@ class CoreOps:
                 "error": str(e)
             }
 
-    def check_cluster_status(self, ai_response: bool = False):
+    def check_cluster_status(self):
         """check the active cluster status (health)
         """
         try:
             response = self.make_request("_cluster/health")
-
-            if ai_response:
-                # check whether AI Mode is On of Off
-
-                ai_mode = self.check_ai_mode()
-                if not ai_mode:
-                    return response
-
-                # check api response if it is an error then take action further on it
-                if response.get("success") is False:
-                    return response
-
-                # ask AI-Model
-                ai_response = self.ask_ai(
-                    f"{response.get('response')}\n\nHere is the cluster health of active elasticsearch cluster. So please explain meaning of each field in this given data. Start from direct explanation.")
-
-                if isinstance(ai_response, tuple):
-                    return {
-                        "success": False,
-                        "error": ai_response[1]
-                    }
-
-                return {
-                    "success": True,
-                    "status": "alive",
-                    "response": ai_response
-                }
 
             return response
 
@@ -213,14 +191,19 @@ class CoreOps:
 
                 if isinstance(ai_response, tuple):
                     return {
-                        "success": False,
-                        "error": ai_response[1]
+                        "success": True,
+                        "status": "alive",
+                        "ai_response": "error",
+                        "response": response.get("response"),
+                        "latency": response.get("latency")
                     }
 
                 return {
                     "success": True,
                     "status": "alive",
-                    "response": ai_response
+                    "ai_response": True,
+                    "response": ai_response,
+                    "latency": response.get("latency")  # elastic API latency
                 }
 
             return response
@@ -254,14 +237,19 @@ class CoreOps:
 
                 if isinstance(ai_response, tuple):
                     return {
-                        "success": False,
-                        "error": ai_response[1]
+                        "success": True,
+                        "status": "alive",
+                        "ai_repsonse": "error",
+                        "response": response.get("response"),
+                        "latency": response.get("latency")
                     }
 
                 return {
                     "success": True,
                     "status": "alive",
-                    "response": ai_response
+                    "ai_response": True,
+                    "response": ai_response,
+                    "latency": response.get("latency")  # elastic API latency
                 }
 
             return response
@@ -271,7 +259,6 @@ class CoreOps:
                 "success": False,
                 "error": str(e)
             }
-            
 
     def nodes(self, ai_response: bool):
         """Return total number active nodes on the running cluster with their information
@@ -296,14 +283,19 @@ class CoreOps:
 
                 if isinstance(ai_response, tuple):
                     return {
-                        "success": False,
-                        "error": ai_response[1]
+                        "success": True,
+                        "status": "alive",
+                        "ai_response": "error",
+                        "response": response.get("response"),
+                        "latency": response.get("latency")
                     }
 
                 return {
                     "success": True,
                     "status": "alive",
-                    "response": ai_response
+                    "ai_response": True,
+                    "response": ai_response,
+                    "latency": response.get("latency") # elastic API latency
                 }
 
             return response

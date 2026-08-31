@@ -4,6 +4,7 @@ import {
   ActivityIcon, ServerIcon, ChevronRightIcon, LayersIcon, ShieldIcon
 } from "./Icons";
 import ConsoleTerminal from "./ConsoleTerminal";
+import BackButton from "./BackButton";
 
 // Backend API Base URL from Vite config (config.yaml)
 const API_BASE_URL = typeof __API_BASE_URL__ !== "undefined"
@@ -236,6 +237,11 @@ export default function HomePage({ onNavigateToTab, theme }) {
 
   return (
     <div className="page-stack">
+
+      {/* ── BACK NAV ── */}
+      <div className="page-heading-nav" style={{ marginBottom: 16 }}>
+        <BackButton />
+      </div>
 
       {/* ── HERO PANEL ── */}
       <div className="hero-panel">

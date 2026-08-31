@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { ServerIcon, ActivityIcon, ShieldIcon, DatabaseIcon } from "./Icons";
+import BackButton from "./BackButton";
 
 // Backend API Base URL from Vite config (config.yaml)
 const API_BASE_URL = typeof __API_BASE_URL__ !== "undefined"
@@ -113,6 +114,9 @@ export default function ClusterHealthPage({ theme }) {
   return (
     <div className="page-stack">
       <div className="page-heading">
+        <div className="page-heading-nav">
+          <BackButton />
+        </div>
         <h1>Cluster Health &amp; Diagnostics</h1>
         <p>Real-time metrics, node allocations, and index health across your Elasticsearch cluster.</p>
       </div>

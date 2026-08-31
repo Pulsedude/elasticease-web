@@ -103,7 +103,7 @@ export default function SidebarDrawer({ isOpen, onClose, activeTab, theme }) {
               </span>
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             </div>
-            <p className="text-[11px] text-secondary">Python API connected</p>
+            <p className="text-[11px] text-secondary">API connected</p>
           </div>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import SidebarDrawer from "./components/SidebarDrawer";
@@ -14,8 +14,8 @@ const API_BASE_URL = typeof __API_BASE_URL__ !== "undefined"
   ? __API_BASE_URL__
   : (typeof __BACKEND_BASE_URL__ !== "undefined" ? __BACKEND_BASE_URL__ : "http://localhost:8000");
 
-const AUTH_USER_KEY = "elasticease_session_user";
-const AUTH_BOOT_KEY = "elasticease_frontend_boot_id";
+const AUTH_USER_KEY  = "elasticease_session_user";
+const AUTH_BOOT_KEY  = "elasticease_frontend_boot_id";
 const FRONTEND_BOOT_ID = typeof __FRONTEND_BOOT_ID__ !== "undefined"
   ? __FRONTEND_BOOT_ID__
   : "static-frontend-session";
@@ -31,6 +31,11 @@ function readSessionUser() {
   catch { sessionStorage.removeItem(AUTH_USER_KEY); return null; }
 }
 
+/**
+ * Map each route to its content-wrapper class.
+ * Console gets a special class that strips padding and makes it
+ * fill the remaining height so the history area scrolls internally.
+ */
 function getPageContentClass(pathname) {
   if (pathname === "/console")  return "page-content--console";
   if (pathname === "/settings") return "page-content--narrow";
@@ -39,10 +44,10 @@ function getPageContentClass(pathname) {
 }
 
 function AppContent() {
-  const [theme, setTheme] = useState(() => localStorage.getItem("elasticease_theme") || "dark");
-  const [user, setUser]   = useState(readSessionUser);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [clusterHealth, setClusterHealth] = useState(null);
+  const [theme,         setTheme]        = useState(() => localStorage.getItem("elasticease_theme") || "dark");
+  const [user,          setUser]         = useState(readSessionUser);
+  const [drawerOpen,    setDrawerOpen]   = useState(false);
+  const [clusterHealth, setClusterHealth]= useState(null);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -52,7 +57,7 @@ function AppContent() {
     localStorage.setItem("elasticease_theme", theme);
   }, [theme]);
 
-  // Poll cluster health for the Navbar status row
+  // Poll cluster health for the Navbar status indicator
   useEffect(() => {
     if (!user) return;
     let active = true;
@@ -62,7 +67,7 @@ function AppContent() {
         if (!res.ok) return;
         const j = await res.json();
         if (active && j?.success && j?.response) setClusterHealth(j.response);
-      } catch { /* silent — Navbar shows last known state */ }
+      } catch { /* silent */ }
     }
     fetchHealth();
     const id = setInterval(fetchHealth, 15_000);
@@ -85,8 +90,9 @@ function AppContent() {
     navigate("/login");
   };
 
-  const isDark    = theme === "dark";
-  const showShell = location.pathname !== "/login" && Boolean(user);
+  const isDark       = theme === "dark";
+  const isConsolePage= location.pathname === "/console";
+  const showShell    = location.pathname !== "/login" && Boolean(user);
 
   let activeTab = "home";
   if (location.pathname === "/console")  activeTab = "console";
@@ -96,7 +102,7 @@ function AppContent() {
   const contentClass = showShell ? getPageContentClass(location.pathname) : "";
 
   return (
-    <div className="app-shell bg-base-surface text-primary">
+    <div className={`app-shell bg-base-surface text-primary${isConsolePage ? " app-shell--console" : ""}`}>
 
       {showShell && (
         <>
@@ -118,7 +124,7 @@ function AppContent() {
         </>
       )}
 
-      <main className="app-main">
+      <main className={`app-main${isConsolePage ? " app-main--console" : ""}`}>
         {showShell ? (
           <div className={contentClass}>
             <Routes>
@@ -153,7 +159,8 @@ function AppContent() {
         )}
       </main>
 
-      {showShell && (
+      {/* Footer — hidden on console page to maximise vertical space */}
+      {showShell && !isConsolePage && (
         <footer className="app-footer">
           <div className="footer-left">
             <span className={`font-semibold text-xs ${isDark ? "text-slate-500" : "text-slate-400"}`}>Elasticease Platform</span>
