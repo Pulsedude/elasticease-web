@@ -43,6 +43,8 @@ export default function ConsoleAppPage({ theme }) {
   const [showSuggestions,      setShowSuggestions]      = useState(true);
   const [validationError,      setValidationError]      = useState(null);
 
+  const [activeArgIndex,       setActiveArgIndex]       = useState(-1);
+
   const inputRef = useRef(null);
 
   // ── Derived: parse + suggestions ────────────────────────
@@ -54,12 +56,11 @@ export default function ConsoleAppPage({ theme }) {
     }
 
     if (parsed.definition) {
-      const argIdx = currentArgIndex(parsed, inputValue);
+      const calcIdx = currentArgIndex(parsed, inputValue);
+      const argIdx = activeArgIndex >= 0 ? activeArgIndex : calcIdx;
       if (argIdx >= 0 && argIdx < parsed.definition.arguments.length) {
         const argDef = parsed.definition.arguments[argIdx];
-        const partial = hasTrailingSpace(inputValue)
-          ? ""
-          : parsed.argTokens[argIdx] ?? "";
+        const partial = parsed.argTokens[argIdx] ?? "";
 
         const argSugg = argDef.type === "enum"
           ? (argDef.options ?? []).filter(o => o.toLowerCase().includes(partial.toLowerCase()))
@@ -69,7 +70,7 @@ export default function ConsoleAppPage({ theme }) {
           commandSuggestions: [],
           argSuggestions: argSugg,
           suggestionMode: "argument",
-          argHint: argDef.required ? `<${argDef.name}>` : `[${argDef.name}]`,
+          argHint: argDef.required ? `<${argDef.name}> (Required)` : `[${argDef.name}] (Optional)`,
         };
       }
       return { commandSuggestions: [], argSuggestions: [], suggestionMode: "command", argHint: null };
@@ -77,7 +78,7 @@ export default function ConsoleAppPage({ theme }) {
 
     const cmdSugg = getCommandSuggestions(inputValue);
     return { commandSuggestions: cmdSugg, argSuggestions: [], suggestionMode: "command", argHint: null };
-  }, [inputValue, parsed, showSuggestions]);
+  }, [inputValue, parsed, showSuggestions, activeArgIndex]);
 
   const hasSuggestions   = commandSuggestions.length > 0 || argSuggestions.length > 0;
   const totalSuggestions = suggestionMode === "command" ? commandSuggestions.length : argSuggestions.length;
@@ -98,15 +99,19 @@ export default function ConsoleAppPage({ theme }) {
       setInputValue(value + suffix);
     } else {
       const tokens = [...parsed.argTokens];
-      const targetIdx = hasTrailingSpace(inputValue) ? tokens.length : Math.max(0, tokens.length - 1);
+      const calcIdx = currentArgIndex(parsed, inputValue);
+      const targetIdx = activeArgIndex >= 0 ? activeArgIndex : Math.max(0, calcIdx);
       tokens[targetIdx] = value;
-      setInputValue(`${parsed.commandName} ${tokens.join(" ")} `);
+
+      const cmdName = parsed.commandName;
+      const formattedTokens = tokens.map(t => (t && t.includes(" ") && !t.startsWith('"')) ? `"${t}"` : t);
+      setInputValue(`${cmdName} ${formattedTokens.join(" ")}`);
     }
     setSuggestionActiveIndex(-1);
     setShowSuggestions(true);
     setValidationError(null);
-    inputRef.current?.focus();
-  }, [suggestionMode, commandSuggestions, parsed, inputValue]);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  }, [suggestionMode, commandSuggestions, parsed, inputValue, activeArgIndex]);
 
   const handleSubmit = useCallback(async () => {
     const trimmed = inputValue.trim();
@@ -264,6 +269,7 @@ export default function ConsoleAppPage({ theme }) {
       <CommandInput
         ref={inputRef}
         value={inputValue}
+        parsed={parsed}
         onChange={handleInputChange}
         onSubmit={handleSubmit}
         onArrowUp={handleArrowUp}
@@ -272,6 +278,7 @@ export default function ConsoleAppPage({ theme }) {
         onTab={handleTab}
         validationError={validationError}
         disabled={Boolean(loadingCommand)}
+        onArgFocusChange={setActiveArgIndex}
       />
 
       <CommandPalette

@@ -234,6 +234,80 @@ async function fetchClusterHealth(parsed) {
   }
 }
 
+function formatShardsTable(data) {
+  if (!Array.isArray(data)) return String(data);
+  if (data.length === 0) return "No shards found.";
+
+  // Columns for the _cat/shards endpoint
+  const cols = ["index", "shard", "prirep", "state", "docs", "store", "ip", "node"];
+  const widths = {};
+  
+  // Initialize widths with header lengths
+  for (const col of cols) {
+    widths[col] = col.length;
+  }
+  
+  // Calculate max widths based on data
+  for (const row of data) {
+    for (const col of cols) {
+      const valLen = String(row[col] || "-").length;
+      if (valLen > widths[col]) {
+        widths[col] = valLen;
+      }
+    }
+  }
+
+  // Generate header
+  const header = cols.map(c => c.padEnd(widths[c])).join("  ");
+  
+  // Generate rows
+  const rows = data.map(row => {
+    return cols.map(c => String(row[c] || "-").padEnd(widths[c])).join("  ");
+  });
+
+  return [header, ...rows].join("\n");
+}
+
+async function fetchShardsList(parsed) {
+  const startTime = performance.now();
+  const rawArg = String(parsed.argMap.json || "").toLowerCase();
+  const isJson = rawArg === "true" || rawArg === "1" || rawArg === "yes";
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/v1/core/shards`);
+    const durationMs = Math.round(performance.now() - startTime);
+
+    if (!res.ok) {
+      return error(`API request failed with HTTP status ${res.status}`, res.status, durationMs);
+    }
+
+    const payload = await res.json();
+    const shardsData = (payload && payload.success && payload.response) ? payload.response : payload;
+
+    if (isJson) {
+      return ok(shardsData, "json", durationMs);
+    } else {
+      return ok(formatShardsTable(shardsData), "table", durationMs);
+    }
+  } catch (err) {
+    const durationMs = Math.round(performance.now() - startTime);
+    // Fallback to mock data if backend server is unavailable
+    if (isJson) {
+      const mockJson = [
+        { index: "users", shard: "0", prirep: "p", state: "STARTED", docs: "6228", store: "4.1mb", ip: "10.0.0.12", node: "node-primary-01" },
+        { index: "users", shard: "0", prirep: "r", state: "STARTED", docs: "6228", store: "4.1mb", ip: "10.0.0.13", node: "node-data-02" },
+        { index: "products", shard: "0", prirep: "p", state: "STARTED", docs: "820401", store: "248mb", ip: "10.0.0.14", node: "node-data-03" },
+        { index: "products", shard: "0", prirep: "r", state: "STARTED", docs: "820401", store: "248mb", ip: "10.0.0.12", node: "node-primary-01" },
+        { index: "orders", shard: "0", prirep: "p", state: "STARTED", docs: "160220", store: "105mb", ip: "10.0.0.13", node: "node-data-02" },
+        { index: "orders", shard: "0", prirep: "r", state: "UNASSIGNED", docs: "-", store: "-", ip: "-", node: "-" }
+      ];
+      return ok(mockJson, "json", durationMs);
+    } else {
+      return ok(MOCK_SHARDS_TABLE, "table", durationMs);
+    }
+  }
+}
+
 /**
  * Execute a parsed command and return a result.
  * This is the ONLY function you need to replace when connecting real API.
@@ -346,7 +420,7 @@ export async function executeCommand(parsed) {
         return ok({ count: Math.floor(Math.random() * 50000), _shards: { total: 2, successful: 2, failed: 0 } }, "json", latency);
 
       case "shards:list":
-        return ok(MOCK_SHARDS_TABLE, "table", latency);
+        return fetchShardsList(parsed);
 
       case "shards:unassigned":
         return ok(`index   shard  prirep  state        reason
