@@ -27,7 +27,7 @@ export const COMMAND_REGISTRY = [
     category: "Cluster",
     arguments: [
       {
-        name: "json = true | false",
+        name: "json",
         type: "boolean",
         description: "Return raw JSON if true, formatted table if false (default: false)",
         required: false,
@@ -184,7 +184,15 @@ export const COMMAND_REGISTRY = [
     name: "shards:list",
     description: "List all shards with state and size",
     category: "Shards",
-    arguments: [],
+    arguments: [
+      {
+        name: "json",
+        type: "boolean",
+        description: "Return raw JSON if true, formatted table if false (default: false)",
+        required: false,
+        options: ["true", "false"],
+      },
+    ],
   },
   {
     name: "shards:unassigned",
