@@ -279,7 +279,7 @@ class CoreOps:
 
                 # ask AI-Model
                 ai_response = self.ask_ai(
-                    f"{response.get('response')}\n\nHere is the all active nodes running on elasticsearch cluster now please can you provide better explaination according to all active nodes data which is more understandable. (start direclty from explaination)")
+                    f"{response.get('response')}\n\nHere is the all active nodes running on elasticsearch cluster now please can you provide better explaination according to all active nodes data which is more understandable in simple order to say that to please summarize this given data. (start direclty from explaination with NO EXTRA SINGLE LINE UNSUAL ANSWER)")
 
                 if isinstance(ai_response, tuple):
                     return {
