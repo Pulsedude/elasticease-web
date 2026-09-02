@@ -3,7 +3,8 @@ from core_operations import CoreOps
 from .models import (
     LoginCredentials,
     AIInferenceUpdate,
-    URLUpdate
+    URLUpdate,
+    PromptForAI
 )
 import config
 import json
@@ -100,11 +101,11 @@ def to_check_the_active_cluster_status():
 
 
 @router.get("/shards", status_code=status.HTTP_200_OK)
-def see_total_number_of_available_shards():
+def see_total_number_of_available_shards(ai_response: bool = False):
     """Return to total number of active shards on target node with detailed information
     """
     try:
-        get_shards = coreops.shards()
+        get_shards = coreops.shards(ai_response)
 
         if get_shards.get("success") is False:
             raise HTTPException(
@@ -321,6 +322,28 @@ def update_backend_base_url(body: URLUpdate):
     except HTTPException:
         raise
 
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": str(e)})
+
+
+@router.post("/ai_summarization", status_code=status.HTTP_200_OK)
+def ask_ai_to_summarize_data(body: PromptForAI):
+    try:
+        ai_response = coreops.ask_ai(body.prompt)
+        
+        if isinstance(ai_response, tuple):
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": ai_response[1]})
+        
+        return {
+            "success": True,
+            "ai_response": True,
+            "response": ai_response
+        }
+    
+    except HTTPException:
+        raise
+    
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": str(e)})

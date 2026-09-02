@@ -16,3 +16,9 @@ class AIInferenceUpdate(BaseModel):
 class URLUpdate(BaseModel):
     model_config = ConfigDict(strict=True)
     base_url: str
+
+
+class PromptForAI(BaseModel):
+    model_config = ConfigDict(strict=True)
+    prompt: str
+    
