@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ╔══════════════════════════════════════════════════════════╗
  * ║  COMMAND VALIDATOR                                      ║
  * ╚══════════════════════════════════════════════════════════╝
@@ -40,6 +40,20 @@ export function validateCommand(parsed) {
       missingArg: arg.name,
       missingArgDef: arg,
     };
+  }
+
+  for (const argDef of parsed.definition.arguments) {
+    let val = parsed.argMap[argDef.name];
+    if (val !== undefined && argDef.options && argDef.options.length > 0) {
+      val = String(val).trim();
+      if (!argDef.options.includes(val.toLowerCase())) {
+        return {
+          valid: false,
+          errorType: "invalid_option",
+          message: `Invalid value "${val}" for argument [${argDef.name}]. Allowed values: ${argDef.options.join(", ")}`,
+        };
+      }
+    }
   }
 
   return { valid: true };

@@ -186,7 +186,7 @@ const CommandInput = forwardRef(function CommandInput(
   return (
     <div className="console-input-area">
       {validationError && (
-        <div className="console-validation-error flex items-center gap-[6px] px-[20px] py-[6px] bg-[rgba(239,68,68,0.06)] border-b border-[rgba(239,68,68,0.1)] text-[#f87171] text-[11.5px]" role="alert" aria-live="assertive">
+        <div className="console-validation-error" role="alert" aria-live="assertive">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
             <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
             <line x1="12" y1="9" x2="12" y2="13" />
@@ -196,8 +196,8 @@ const CommandInput = forwardRef(function CommandInput(
         </div>
       )}
 
-      <div className="console-input-row flex items-center gap-[10px] px-[20px] h-[52px]">
-        <span className="console-input-prompt text-[#6366f1] text-[18px] font-bold shrink-0 select-none leading-none" aria-hidden="true">›</span>
+      <div className="console-input-row">
+        <span className="console-input-prompt" aria-hidden="true">›</span>
 
         {!hasCommand ? (
           <input
@@ -207,7 +207,7 @@ const CommandInput = forwardRef(function CommandInput(
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={handleMainKeyDown}
             placeholder={placeholder}
-            className="console-input flex-1 min-w-0 h-full border-0 outline-none bg-transparent text-[14px] font-medium caret-[#6366f1] disabled:opacity-50 disabled:cursor-not-allowed"
+            className="console-input"
             spellCheck={false}
             autoComplete="off"
             autoCorrect="off"
@@ -274,8 +274,8 @@ const CommandInput = forwardRef(function CommandInput(
                       <input
                         ref={(el) => (argInputRefs.current[i] = el)}
                         type="text"
-                        className="console-input bg-transparent border-0 outline-none font-mono text-[13px] font-medium h-[24px] focus:outline-none"
-                        style={{ width: `${inputCharWidth}ch` }}
+                        className="console-input"
+                        style={{ width: `${inputCharWidth}ch`, height: 24 }}
                         value={val}
                         onChange={(e) => handleArgInputChange(i, e.target.value)}
                         onFocus={() => handleArgFocus(i)}

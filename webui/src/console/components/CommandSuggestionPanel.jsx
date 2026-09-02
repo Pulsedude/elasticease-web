@@ -32,8 +32,8 @@ export default function CommandSuggestionPanel({
       {mode === "command" && (
         <>
           {argHint && (
-            <div className="suggestion-arg-hint flex items-center gap-2 px-5 py-1.5">
-              <span className="suggestion-arg-hint-text text-xs font-mono font-medium">{argHint}</span>
+            <div className="suggestion-arg-hint">
+              <span className="suggestion-arg-hint-text">{argHint}</span>
             </div>
           )}
           {suggestions.map((s, i) => (
@@ -51,9 +51,9 @@ export default function CommandSuggestionPanel({
       {mode === "argument" && (
         <>
           {argHint && (
-            <div className="suggestion-arg-hint flex items-center gap-2 px-5 py-1.5">
-              <span className="suggestion-arg-hint-label text-[10px] font-bold uppercase tracking-wider">Argument</span>
-              <span className="suggestion-arg-hint-text text-xs font-mono font-medium">{argHint}</span>
+            <div className="suggestion-arg-hint">
+              <span className="suggestion-arg-hint-label">Argument</span>
+              <span className="suggestion-arg-hint-text">{argHint}</span>
             </div>
           )}
           {argSuggestions.map((val, i) => (
@@ -83,8 +83,8 @@ function SuggestionRow({ command, segments, isActive, onSelect }) {
       onClick={onSelect}
       onMouseDown={e => e.preventDefault()}
     >
-      <div className="suggestion-row-main flex items-center gap-2 font-mono">
-        <span className="suggestion-name text-xs font-semibold">
+      <div className="suggestion-row-main">
+        <span className="suggestion-name">
           {segments
             ? segments.map((seg, i) => (
                 <span
@@ -97,10 +97,10 @@ function SuggestionRow({ command, segments, isActive, onSelect }) {
             : command.name}
         </span>
         {argHints && (
-          <span className="suggestion-args text-xs">{argHints}</span>
+          <span className="suggestion-args">{argHints}</span>
         )}
       </div>
-      <div className="suggestion-desc text-xs leading-snug">{command.description}</div>
+      <div className="suggestion-desc">{command.description}</div>
     </div>
   );
 }
@@ -114,7 +114,7 @@ function ArgSuggestionRow({ value, isActive, onSelect }) {
       onClick={onSelect}
       onMouseDown={e => e.preventDefault()}
     >
-      <span className="suggestion-arg-value text-xs font-mono font-semibold">{value}</span>
+      <span className="suggestion-arg-value">{value}</span>
     </div>
   );
 }

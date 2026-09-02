@@ -270,11 +270,13 @@ function formatShardsTable(data) {
 
 async function fetchShardsList(parsed) {
   const startTime = performance.now();
-  const rawArg = String(parsed.argMap.json || "").toLowerCase();
+  const rawArg = String(parsed.argMap.json || "").toLowerCase().trim();
   const isJson = rawArg === "true" || rawArg === "1" || rawArg === "yes";
+  const rawAiArg = String(parsed.argMap.ai_powered_response || "").toLowerCase().trim();
+  const isAi = rawAiArg === "true" || rawAiArg === "1" || rawAiArg === "yes";
 
   try {
-    const res = await fetch(`${API_BASE_URL}/v1/core/shards`);
+    const res = await fetch(`${API_BASE_URL}/v1/core/shards?ai_response=${isAi}`);
     const durationMs = Math.round(performance.now() - startTime);
 
     if (!res.ok) {
@@ -283,14 +285,16 @@ async function fetchShardsList(parsed) {
 
     const payload = await res.json();
     const shardsData = (payload && payload.success && payload.response) ? payload.response : payload;
+    const aiResponse = (payload && payload.success && payload.ai_response) ? payload.ai_response : null;
 
     if (isJson) {
-      return ok(shardsData, "json", durationMs);
+      return { ...ok(shardsData, "json", durationMs), aiResponse };
     } else {
-      return ok(formatShardsTable(shardsData), "table", durationMs);
+      return { ...ok(formatShardsTable(shardsData), "table", durationMs), aiResponse };
     }
   } catch (err) {
     const durationMs = Math.round(performance.now() - startTime);
+    const mockAiResponse = isAi ? "This is a mock AI explanation of your shards. In a real environment, this would explain the shards status, health, and assignment." : null;
     // Fallback to mock data if backend server is unavailable
     if (isJson) {
       const mockJson = [
@@ -301,9 +305,81 @@ async function fetchShardsList(parsed) {
         { index: "orders", shard: "0", prirep: "p", state: "STARTED", docs: "160220", store: "105mb", ip: "10.0.0.13", node: "node-data-02" },
         { index: "orders", shard: "0", prirep: "r", state: "UNASSIGNED", docs: "-", store: "-", ip: "-", node: "-" }
       ];
-      return ok(mockJson, "json", durationMs);
+      return { ...ok(mockJson, "json", durationMs), aiResponse: mockAiResponse };
     } else {
-      return ok(MOCK_SHARDS_TABLE, "table", durationMs);
+      return { ...ok(MOCK_SHARDS_TABLE, "table", durationMs), aiResponse: mockAiResponse };
+    }
+  }
+}
+
+function formatIndexTable(data) {
+  if (!Array.isArray(data)) return String(data);
+  if (data.length === 0) return "No indices found.";
+
+  const cols = ["health", "status", "index", "uuid", "pri", "rep", "docs.count", "docs.deleted", "store.size"];
+  const widths = {};
+  
+  for (const col of cols) {
+    widths[col] = col.length;
+  }
+  
+  for (const row of data) {
+    for (const col of cols) {
+      const valLen = String(row[col] || "-").length;
+      if (valLen > widths[col]) {
+        widths[col] = valLen;
+      }
+    }
+  }
+
+  const header = cols.map(c => c.padEnd(widths[c])).join("  ");
+  
+  const rows = data.map(row => {
+    return cols.map(c => String(row[c] || "-").padEnd(widths[c])).join("  ");
+  });
+
+  return [header, ...rows].join("\n");
+}
+
+async function fetchIndexList(parsed) {
+  const startTime = performance.now();
+  const rawArg = String(parsed.argMap.json || "").toLowerCase().trim();
+  const isJson = rawArg === "true" || rawArg === "1" || rawArg === "yes";
+  const rawAiArg = String(parsed.argMap.ai_summary || "").toLowerCase().trim();
+  const isAi = rawAiArg === "true" || rawAiArg === "1" || rawAiArg === "yes";
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/v1/core/indices?ai_response=${isAi}`);
+    const durationMs = Math.round(performance.now() - startTime);
+
+    if (!res.ok) {
+      return error(`API request failed with HTTP status ${res.status}`, res.status, durationMs);
+    }
+
+    const payload = await res.json();
+    const indexData = (payload && payload.success && payload.response) ? payload.response : payload;
+    const aiResponse = (payload && payload.success && payload.ai_response) ? payload.ai_response : null;
+
+    if (isJson) {
+      return { ...ok(indexData, "json", durationMs), aiResponse };
+    } else {
+      return { ...ok(formatIndexTable(indexData), "table", durationMs), aiResponse };
+    }
+  } catch (err) {
+    const durationMs = Math.round(performance.now() - startTime);
+    const mockAiResponse = isAi ? "This is a mock AI explanation of your indices. It provides an overview of health and storage." : null;
+    
+    if (isJson) {
+      const mockJson = [
+        { health: "green", status: "open", index: "users", uuid: "aB1Cd2EfGhIjK", pri: "2", rep: "1", "docs.count": "12453", "docs.deleted": "102", "store.size": "8.2mb" },
+        { health: "green", status: "open", index: "products", uuid: "Lk3Mn4OpQrStU", pri: "3", rep: "1", "docs.count": "4102005", "docs.deleted": "8921", "store.size": "1.24gb" },
+        { health: "green", status: "open", index: "orders", uuid: "vW5Xy6ZaBcDeF", pri: "2", rep: "1", "docs.count": "320441", "docs.deleted": "4102", "store.size": "210.5mb" },
+        { health: "yellow", status: "open", index: "logs", uuid: "Gh7Ij8KlMnOpQ", pri: "4", rep: "1", "docs.count": "1420891", "docs.deleted": "0", "store.size": "842.0mb" },
+        { health: "green", status: "open", index: "analytics", uuid: "xZQMq_XDR8ix-11", pri: "3", rep: "1", "docs.count": "850210", "docs.deleted": "0", "store.size": "310.0mb" }
+      ];
+      return { ...ok(mockJson, "json", durationMs), aiResponse: mockAiResponse };
+    } else {
+      return { ...ok(MOCK_INDEX_LIST_TABLE, "table", durationMs), aiResponse: mockAiResponse };
     }
   }
 }
@@ -343,7 +419,7 @@ export async function executeCommand(parsed) {
         return ok({ tasks: [] }, "json", latency);
 
       case "index:list":
-        return ok(MOCK_INDEX_LIST_TABLE, "table", latency);
+        return fetchIndexList(parsed);
 
       case "index:get":
         return ok(mockIndexInfo(args.index || "unknown"), "json", latency);
