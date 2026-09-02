@@ -1496,6 +1496,12 @@ select:focus-visible {
 .console-input::placeholder { color: #1e2130; }
 .console-input:disabled { opacity: 0.5; cursor: not-allowed; }
 
+/* Argument-chip inputs: slightly smaller than main command input */
+.console-input-area div div .console-input {
+  font-size: 13px;
+  height: auto;
+}
+
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
   25% { transform: translateX(-3px); }
@@ -2029,6 +2035,68 @@ select:focus-visible {
   background: var(--con-raised);
   color: var(--con-text-dim);
   border-color: var(--con-border-item);
+}
+
+/* AI Markdown styling */
+.console-ai-markdown {
+  font-family: inherit;
+  color: var(--con-text-bright);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.console-ai-markdown p { margin-bottom: 8px; }
+.console-ai-markdown p:last-child { margin-bottom: 0; }
+.console-ai-markdown ul, .console-ai-markdown ol { padding-left: 32px; margin-bottom: 8px; }
+.console-ai-markdown ul { list-style-type: disc; }
+.console-ai-markdown ol { list-style-type: decimal; }
+.console-ai-markdown li { margin-bottom: 4px; padding-left: 4px; }
+.console-ai-markdown strong { font-weight: 600; color: var(--con-blue); }
+.console-ai-markdown code {
+  background: rgba(99,102,241,0.15);
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.9em;
+  color: var(--con-accent);
+}
+.console-ai-markdown pre {
+  background: rgba(0,0,0,0.2);
+  border: 1px solid var(--con-border-faint);
+  padding: 8px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  overflow-x: auto;
+}
+.console-ai-markdown pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+.console-ai-markdown h1, .console-ai-markdown h2, .console-ai-markdown h3, .console-ai-markdown h4 {
+  font-weight: 600;
+  margin-top: 12px;
+  margin-bottom: 8px;
+  color: var(--con-text-bright);
+}
+.console-ai-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  margin-bottom: 8px;
+  font-size: 12.5px;
+}
+.console-ai-markdown th, .console-ai-markdown td {
+  border: 1px solid var(--con-border-faint);
+  padding: 6px 10px;
+  text-align: left;
+}
+.console-ai-markdown th {
+  background: var(--con-raised);
+  font-weight: 600;
+  color: var(--con-text-bright);
+}
+.console-ai-markdown tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.02);
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

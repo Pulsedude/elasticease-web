@@ -65,7 +65,22 @@ export const COMMAND_REGISTRY = [
     name: "index:list",
     description: "List all indices with health, status, and doc count",
     category: "Index",
-    arguments: [],
+    arguments: [
+      {
+        name: "json",
+        type: "boolean",
+        description: "Return raw JSON if true, formatted table if false (default: false)",
+        required: false,
+        options: ["true", "false"],
+      },
+      {
+        name: "ai_summarization",
+        type: "boolean",
+        description: "Get AI powered summary (default: false)",
+        required: false,
+        options: ["true", "false"],
+      },
+    ],
   },
   {
     name: "index:get",
@@ -189,6 +204,13 @@ export const COMMAND_REGISTRY = [
         name: "json",
         type: "boolean",
         description: "Return raw JSON if true, formatted table if false (default: false)",
+        required: false,
+        options: ["true", "false"],
+      },
+      {
+        name: "ai_summarization",
+        type: "boolean",
+        description: "Get AI powered summary (default: false)",
         required: false,
         options: ["true", "false"],
       },
