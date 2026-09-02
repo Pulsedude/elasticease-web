@@ -168,7 +168,7 @@ class CoreOps:
                 "error": str(e)
             }
 
-    def shards(self, ai_response: bool = False):
+    def shards(self, ai_response: bool):
         """Return the all available active shards. Cluster -> Node -> Shards
         """
         try:
@@ -187,7 +187,7 @@ class CoreOps:
 
                 # ask AI-Model
                 ai_response = self.ask_ai(
-                    f"{response.get('response')}\n\nHere is the all available active shards on my elasticsearch node now can you please explain detail of each shard according to their data. Start directly from explaining.")
+                    f"{response.get('response')}\n\nHere is the all available active shards on my elasticsearch node now can you please explain detail of each shard according to their data in simple order to say that please summarize this whole data. Start directly from explaining and NO EXTRA ANSWER.")
 
                 if isinstance(ai_response, tuple):
                     return {
@@ -201,8 +201,8 @@ class CoreOps:
                 return {
                     "success": True,
                     "status": "alive",
-                    "ai_response": True,
-                    "response": ai_response,
+                    "ai_response": ai_response,
+                    "response": response.get("response"),
                     "latency": response.get("latency")  # elastic API latency
                 }
 
@@ -214,7 +214,7 @@ class CoreOps:
                 "error": str(e)
             }
 
-    def indices(self, ai_response: bool = False):
+    def indices(self, ai_response: bool):
         """Return the all available indices
         """
         try:
@@ -233,13 +233,13 @@ class CoreOps:
 
                 # ask AI-Model
                 ai_response = self.ask_ai(
-                    f"{response.get('response')}\n\nHere is the all available active indices on my elasticsearch node now please start explaining the each index data according to their data in details. Start directly from explaining.")
+                    f"{response.get('response')}\n\nHere is the all available active indices on my elasticsearch node now please start explaining the each index data according to their data in details in simple order to say that please summarize this given data. Start directly from explaining and NO EXTRA ANSWER.")
 
                 if isinstance(ai_response, tuple):
                     return {
                         "success": True,
                         "status": "alive",
-                        "ai_repsonse": "error",
+                        "ai_response": "error",
                         "response": response.get("response"),
                         "latency": response.get("latency")
                     }
@@ -247,8 +247,8 @@ class CoreOps:
                 return {
                     "success": True,
                     "status": "alive",
-                    "ai_response": True,
-                    "response": ai_response,
+                    "ai_response": ai_response,
+                    "response": response.get("response"),
                     "latency": response.get("latency")  # elastic API latency
                 }
 
@@ -293,8 +293,8 @@ class CoreOps:
                 return {
                     "success": True,
                     "status": "alive",
-                    "ai_response": True,
-                    "response": ai_response,
+                    "ai_response": ai_response,
+                    "response": response.get("response"),
                     "latency": response.get("latency") # elastic API latency
                 }
 
