@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useImperativeHandle, forwardRef, useCallback, useState } from "react";
+import React, { useRef, useEffect, useLayoutEffect, useImperativeHandle, forwardRef, useCallback, useState } from "react";
 
 /**
  * CommandInput — bottom fixed input bar with interactive inline argument chips.
@@ -46,33 +46,22 @@ const CommandInput = forwardRef(function CommandInput(
     },
   }));
 
-  // Auto-focus on mount
-  useEffect(() => {
+  // Synchronously focus first argument when a command is entered, or main input when cleared
+  useLayoutEffect(() => {
     if (hasCommand && argDefs.length > 0) {
-      const idx = focusedArgIndex >= 0 && focusedArgIndex < argDefs.length ? focusedArgIndex : 0;
-      argInputRefs.current[idx]?.focus();
-    } else if (hasCommand && argDefs.length === 0) {
-      noArgInputRef.current?.focus();
-    } else {
-      mainInputRef.current?.focus();
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Keep focus index and parent activeArgIndex synchronized
-  useEffect(() => {
-    if (!hasCommand) {
-      if (focusedArgIndex !== -1) {
-        setFocusedArgIndex(-1);
-        if (onArgFocusChange) onArgFocusChange(-1);
-      }
-    } else if (argDefs.length > 0 && (focusedArgIndex === -1 || focusedArgIndex >= argDefs.length)) {
       setFocusedArgIndex(0);
       if (onArgFocusChange) onArgFocusChange(0);
-      setTimeout(() => argInputRefs.current[0]?.focus(), 0);
+      argInputRefs.current[0]?.focus();
     } else if (hasCommand && argDefs.length === 0) {
-      setTimeout(() => noArgInputRef.current?.focus(), 0);
+      setFocusedArgIndex(-1);
+      if (onArgFocusChange) onArgFocusChange(-1);
+      noArgInputRef.current?.focus();
+    } else {
+      setFocusedArgIndex(-1);
+      if (onArgFocusChange) onArgFocusChange(-1);
+      mainInputRef.current?.focus();
     }
-  }, [hasCommand, argDefs.length, focusedArgIndex, onArgFocusChange]);
+  }, [hasCommand, commandDef?.name]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleArgFocus = (index) => {
     setFocusedArgIndex(index);
@@ -82,25 +71,41 @@ const CommandInput = forwardRef(function CommandInput(
   const handleArgInputChange = (index, newVal) => {
     if (!parsed?.commandName) return;
 
-    const tokens = [...(parsed?.argTokens || [])];
-    while (tokens.length <= index) {
-      tokens.push("");
+    const maxLen = Math.max(argDefs.length, (parsed?.argTokens || []).length, index + 1);
+    const tokens = [];
+    for (let i = 0; i < maxLen; i++) {
+      tokens.push(parsed?.argTokens?.[i] ?? "");
     }
     tokens[index] = newVal;
 
-    const cmdName = parsed.commandName;
-    const formattedTokens = tokens.map(t => {
-      if (!t) return "";
-      return t.includes(" ") && !t.startsWith('"') ? `"${t}"` : t;
-    });
-
-    let endIdx = formattedTokens.length - 1;
-    while (endIdx >= 0 && !formattedTokens[endIdx] && endIdx !== index) {
-      endIdx--;
+    let lastNonEmptyIdx = -1;
+    for (let i = tokens.length - 1; i >= 0; i--) {
+      if (tokens[i] !== undefined && String(tokens[i]).trim() !== "") {
+        lastNonEmptyIdx = i;
+        break;
+      }
     }
-    const cleanTokens = formattedTokens.slice(0, endIdx + 1);
 
-    const newFullString = `${cmdName} ${cleanTokens.join(" ")}`;
+    const cmdName = parsed.commandName;
+
+    if (lastNonEmptyIdx === -1) {
+      onChange(`${cmdName} `);
+      return;
+    }
+
+    const formattedTokens = [];
+    for (let i = 0; i <= lastNonEmptyIdx; i++) {
+      const t = String(tokens[i] ?? "");
+      if (t === "") {
+        formattedTokens.push('""');
+      } else if (t.includes(" ") && !t.startsWith('"')) {
+        formattedTokens.push(`"${t}"`);
+      } else {
+        formattedTokens.push(t);
+      }
+    }
+
+    const newFullString = `${cmdName} ${formattedTokens.join(" ")}`;
     onChange(newFullString);
   };
 
@@ -283,6 +288,7 @@ const CommandInput = forwardRef(function CommandInput(
                         placeholder={argDef.description || `enter ${argDef.name}`}
                         spellCheck={false}
                         autoComplete="off"
+                        autoFocus={hasCommand && i === 0}
                         disabled={disabled}
                         aria-label={`Argument ${argDef.name}`}
                       />

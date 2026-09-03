@@ -28,7 +28,7 @@ export function validateCommand(parsed) {
   }
 
   const missingArgs = parsed.definition.arguments.filter(
-    arg => arg.required && parsed.argMap[arg.name] === undefined
+    arg => arg.required && (parsed.argMap[arg.name] === undefined || String(parsed.argMap[arg.name]).trim() === "")
   );
 
   if (missingArgs.length > 0) {
@@ -44,7 +44,7 @@ export function validateCommand(parsed) {
 
   for (const argDef of parsed.definition.arguments) {
     let val = parsed.argMap[argDef.name];
-    if (val !== undefined && argDef.options && argDef.options.length > 0) {
+    if (val !== undefined && String(val).trim() !== "" && argDef.options && argDef.options.length > 0) {
       val = String(val).trim();
       if (!argDef.options.includes(val.toLowerCase())) {
         return {

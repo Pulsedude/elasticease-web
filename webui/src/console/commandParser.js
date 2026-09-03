@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ╔══════════════════════════════════════════════════════════╗
  * ║  COMMAND PARSER                                         ║
  * ║  Transforms raw input string into a structured          ║
@@ -29,22 +29,34 @@ export function tokenise(input) {
   let current = "";
   let inQuote = false;
   let quoteChar = "";
+  let hasToken = false;
 
   for (let i = 0; i < input.length; i++) {
     const ch = input[i];
     if (inQuote) {
-      if (ch === quoteChar) { inQuote = false; }
-      else { current += ch; }
+      if (ch === quoteChar) {
+        inQuote = false;
+        hasToken = true;
+      } else {
+        current += ch;
+        hasToken = true;
+      }
     } else if (ch === '"' || ch === "'") {
       inQuote = true;
       quoteChar = ch;
+      hasToken = true;
     } else if (ch === " " || ch === "\t") {
-      if (current.length > 0) { tokens.push(current); current = ""; }
+      if (hasToken || current.length > 0) {
+        tokens.push(current);
+        current = "";
+        hasToken = false;
+      }
     } else {
       current += ch;
+      hasToken = true;
     }
   }
-  if (current.length > 0) tokens.push(current);
+  if (hasToken || current.length > 0) tokens.push(current);
   return tokens;
 }
 
