@@ -168,13 +168,13 @@ class CoreOps:
                 "error": str(e)
             }
 
-    def shards(self, ai_response: bool):
+    def shards(self, ai_summarization: bool):
         """Return the all available active shards. Cluster -> Node -> Shards
         """
         try:
             response = self.make_request("_cat/shards?format=json")
 
-            if ai_response:
+            if ai_summarization:
                 # check whether AI Mode is On of Off
 
                 # check api response if it is an error then take action further on it
@@ -186,14 +186,14 @@ class CoreOps:
                     return response
 
                 # ask AI-Model
-                ai_response = self.ask_ai(
+                ai_summary = self.ask_ai(
                     f"{response.get('response')}\n\nHere is the all available active shards on my elasticsearch node now can you please explain detail of each shard according to their data in simple order to say that please summarize this whole data. Start directly from explaining and NO EXTRA ANSWER.")
 
-                if isinstance(ai_response, tuple):
+                if isinstance(ai_summary, tuple):
                     return {
                         "success": True,
                         "status": "alive",
-                        "ai_response": "error",
+                        "ai_summary": "error",
                         "response": response.get("response"),
                         "latency": response.get("latency")
                     }
@@ -201,7 +201,7 @@ class CoreOps:
                 return {
                     "success": True,
                     "status": "alive",
-                    "ai_response": ai_response,
+                    "ai_summary": ai_summary,
                     "response": response.get("response"),
                     "latency": response.get("latency")  # elastic API latency
                 }
@@ -214,13 +214,13 @@ class CoreOps:
                 "error": str(e)
             }
 
-    def indices(self, ai_response: bool):
+    def indices(self, ai_summarization: bool):
         """Return the all available indices
         """
         try:
             response = self.make_request("_cat/indices?format=json")
 
-            if ai_response:
+            if ai_summarization:
                 # check whether AI Mode is On of Off
 
                 ai_mode = self.check_ai_mode()
@@ -232,14 +232,14 @@ class CoreOps:
                     return response
 
                 # ask AI-Model
-                ai_response = self.ask_ai(
+                ai_summary = self.ask_ai(
                     f"{response.get('response')}\n\nHere is the all available active indices on my elasticsearch node now please start explaining the each index data according to their data in details in simple order to say that please summarize this given data. Start directly from explaining and NO EXTRA ANSWER.")
 
-                if isinstance(ai_response, tuple):
+                if isinstance(ai_summary, tuple):
                     return {
                         "success": True,
                         "status": "alive",
-                        "ai_response": "error",
+                        "ai_summary": "error",
                         "response": response.get("response"),
                         "latency": response.get("latency")
                     }
@@ -247,7 +247,7 @@ class CoreOps:
                 return {
                     "success": True,
                     "status": "alive",
-                    "ai_response": ai_response,
+                    "ai_summary": ai_summary,
                     "response": response.get("response"),
                     "latency": response.get("latency")  # elastic API latency
                 }
@@ -260,13 +260,13 @@ class CoreOps:
                 "error": str(e)
             }
 
-    def nodes(self, ai_response: bool):
+    def nodes(self, ai_summarization: bool):
         """Return total number active nodes on the running cluster with their information
         """
         try:
             response = self.make_request("_cat/nodes?format=json")
 
-            if ai_response:
+            if ai_summarization:
                 # check whether AI Mode is On of Off
 
                 ai_mode = self.check_ai_mode()
@@ -278,14 +278,14 @@ class CoreOps:
                     return response
 
                 # ask AI-Model
-                ai_response = self.ask_ai(
+                ai_summary = self.ask_ai(
                     f"{response.get('response')}\n\nHere is the all active nodes running on elasticsearch cluster now please can you provide better explaination according to all active nodes data which is more understandable in simple order to say that to please summarize this given data. (start direclty from explaination with NO EXTRA SINGLE LINE UNSUAL ANSWER)")
 
-                if isinstance(ai_response, tuple):
+                if isinstance(ai_summary, tuple):
                     return {
                         "success": True,
                         "status": "alive",
-                        "ai_response": "error",
+                        "ai_summary": "error",
                         "response": response.get("response"),
                         "latency": response.get("latency")
                     }
@@ -293,15 +293,65 @@ class CoreOps:
                 return {
                     "success": True,
                     "status": "alive",
-                    "ai_response": ai_response,
+                    "ai_summary": ai_summary,
                     "response": response.get("response"),
-                    "latency": response.get("latency") # elastic API latency
+                    "latency": response.get("latency")  # elastic API latency
                 }
 
             return response
 
         except Exception as e:
             return {
-                "sccuess": False,
+                "success": False,
+                "error": str(e)
+            }
+
+    def index_info(self, index_name: str, additional_endpoint: str, ai_summarization: bool):
+        """Retrieve the details of specific index (default response is core details of index) 
+        """
+        try:
+            index = index_name.strip("/") if index_name.endswith("/") or index_name.startswith("/") else index_name
+            additional_info_type = additional_endpoint.strip("/") if additional_endpoint.endswith("/") or additional_endpoint.startswith("/") else additional_endpoint
+            
+            response = self.make_request(f"{index}/{additional_info_type}")
+
+            if ai_summarization:
+                # check whether AI Mode is On of Off
+
+                ai_mode = self.check_ai_mode()
+                if not ai_mode:
+                    return response
+
+                # check api response if it is an error then take action further on it
+                if response.get("success") is False:
+                    return response
+
+                # ask AI-Model
+                ai_summary = self.ask_ai(
+                    f"{response.get('response')}\n\nHere is the details of any such specific index of elasticsearch so now can you please summarize the this given data or details of this specific index. (start direclty from explaination with NO EXTRA SINGLE LINE UNSUAL ANSWER)")
+
+                if isinstance(ai_summary, tuple):
+                    return {
+                        "success": True,
+                        "status": "alive",
+                        "ai_summary": "error",
+                        "response": response.get("response"),
+                        "latency": response.get("latency")
+                    }
+
+                return {
+                    "success": True,
+                    "status": "alive",
+                    "ai_summary": ai_summary,
+                    "response": response.get("response"),
+                    # elastic API latency
+                    "latency": response.get("latency")
+                }
+
+            return response
+
+        except Exception as e:
+            return {
+                "success": False,
                 "error": str(e)
             }

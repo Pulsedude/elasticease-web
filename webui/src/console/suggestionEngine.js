@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ╔══════════════════════════════════════════════════════════╗
  * ║  SUGGESTION ENGINE                                      ║
  * ║  Completely decoupled from UI.                          ║
@@ -130,6 +130,8 @@ export function getArgumentSuggestions(commandName, argName, argType, partialInp
     candidates = MOCK_INDICES;
   } else if (argType === "node") {
     candidates = MOCK_NODES;
+  } else if (argName === "info_type") {
+    candidates = ["mapping", "settings", "stats", "aliases"];
   } else if (argType === "enum") {
     // Handled by caller who has the options array
     return [];

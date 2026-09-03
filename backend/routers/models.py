@@ -3,7 +3,6 @@ from typing import Optional
 
 class LoginCredentials(BaseModel):
     model_config  = ConfigDict(strict=True)
-    
     username: str
     password: str
 
@@ -22,3 +21,9 @@ class PromptForAI(BaseModel):
     model_config = ConfigDict(strict=True)
     prompt: str
     
+
+class IndexDetails(BaseModel):
+    model_config = ConfigDict(strict=True)
+    name: str 
+    additional_endpoint: str = ""
+    ai_summarization: bool = False

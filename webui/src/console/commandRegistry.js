@@ -83,6 +83,39 @@ export const COMMAND_REGISTRY = [
     ],
   },
   {
+    name: "index:search",
+    description: "Inspect specific index details, mappings, settings, or stats",
+    category: "Index",
+    arguments: [
+      {
+        name: "index_name",
+        type: "index",
+        description: "Index name to inspect",
+        required: true,
+      },
+      {
+        name: "info_type",
+        type: "string",
+        description: "Type of information (e.g. mapping, settings, stats)",
+        required: false,
+      },
+      {
+        name: "json",
+        type: "boolean",
+        description: "Return raw JSON if true, formatted output if false (default: false)",
+        required: false,
+        options: ["true", "false"],
+      },
+      {
+        name: "ai_summarization",
+        type: "boolean",
+        description: "Get AI powered summary (default: false)",
+        required: false,
+        options: ["true", "false"],
+      },
+    ],
+  },
+  {
     name: "index:get",
     description: "Get information about a specific index",
     category: "Index",

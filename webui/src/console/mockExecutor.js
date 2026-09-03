@@ -384,6 +384,423 @@ async function fetchIndexList(parsed) {
   }
 }
 
+function formatRowsToTable(rows, cols) {
+  if (!rows || rows.length === 0) return null;
+  const widths = {};
+  for (const col of cols) {
+    widths[col] = col.length;
+  }
+  for (const row of rows) {
+    for (const col of cols) {
+      const valLen = String(row[col] ?? "-").length;
+      if (valLen > widths[col]) {
+        widths[col] = valLen;
+      }
+    }
+  }
+  const header = cols.map(c => c.padEnd(widths[c])).join("  ");
+  const tableRows = rows.map(row => {
+    return cols.map(c => String(row[c] ?? "-").padEnd(widths[c])).join("  ");
+  });
+  return [header, ...tableRows].join("\n");
+}
+
+function formatIndexInspectTable(data, infoType) {
+  if (typeof data === "string") return data;
+  if (!data || typeof data !== "object") return null;
+
+  if (Array.isArray(data)) {
+    if (data.length === 0) return "No data found.";
+    const cols = Object.keys(data[0] || {});
+    if (cols.length > 0) return formatRowsToTable(data, cols);
+    return null;
+  }
+
+  let targetObj = data;
+  const topKeys = Object.keys(data);
+  if (topKeys.length === 1 && typeof data[topKeys[0]] === "object" && data[topKeys[0]] !== null && !data[topKeys[0]]._shards && !data[topKeys[0]].error) {
+    targetObj = data[topKeys[0]];
+  }
+
+  const normalizedType = (infoType || "").toLowerCase().trim();
+
+  // 1. Specific mapping inspection: e.g. index:search <index> mapping
+  if (normalizedType.includes("mapping")) {
+    const mappings = targetObj.mappings || (targetObj.properties ? targetObj : null);
+    const properties = mappings?.properties;
+    if (properties && typeof properties === "object") {
+      const rows = [];
+      for (const [field, def] of Object.entries(properties)) {
+        let details = "-";
+        if (def?.fields) {
+          details = Object.keys(def.fields).map(f => `${f} (${def.fields[f].type})`).join(", ");
+        } else if (def?.analyzer) {
+          details = `analyzer: ${def.analyzer}`;
+        } else if (def?.format) {
+          details = `format: ${def.format}`;
+        }
+        rows.push({
+          field,
+          type: def?.type || (def?.properties ? "object" : "unknown"),
+          details,
+        });
+      }
+      if (rows.length > 0) {
+        return formatRowsToTable(rows, ["field", "type", "details"]);
+      }
+    }
+  }
+
+  // 2. Specific settings inspection: e.g. index:search <index> settings
+  if (normalizedType.includes("setting")) {
+    const settings = targetObj.settings?.index || targetObj.settings || targetObj;
+    const rows = [];
+    if (topKeys[0]) rows.push({ key: "Index Name", value: topKeys[0] });
+    function flattenSettings(obj, prefix = "") {
+      for (const [k, v] of Object.entries(obj)) {
+        const fullKey = prefix ? `${prefix}.${k}` : k;
+        if (v && typeof v === "object" && !Array.isArray(v)) {
+          flattenSettings(v, fullKey);
+        } else {
+          rows.push({ key: fullKey, value: String(v) });
+        }
+      }
+    }
+    flattenSettings(settings);
+    if (rows.length > 0) {
+      return formatRowsToTable(rows, ["key", "value"]);
+    }
+  }
+
+  // 3. Specific stats inspection: e.g. index:search <index> stats
+  if (normalizedType.includes("stat")) {
+    const primaries = targetObj._all?.primaries || (topKeys[0] && targetObj.indices?.[topKeys[0]]?.primaries) || targetObj.primaries || targetObj;
+    const rows = [];
+    if (topKeys[0]) rows.push({ key: "Index Name", value: topKeys[0] });
+    if (primaries.docs) {
+      rows.push({ key: "docs.count", value: String(primaries.docs.count ?? "-") });
+      rows.push({ key: "docs.deleted", value: String(primaries.docs.deleted ?? "-") });
+    }
+    if (primaries.store) {
+      const bytes = Number(primaries.store.size_in_bytes ?? 0);
+      const mb = bytes > 0 ? ` (${(bytes / (1024 * 1024)).toFixed(2)} MB)` : "";
+      rows.push({ key: "store.size", value: `${bytes} bytes${mb}` });
+    }
+    if (primaries.indexing) {
+      rows.push({ key: "indexing.index_total", value: String(primaries.indexing.index_total ?? "-") });
+    }
+    if (primaries.search) {
+      rows.push({ key: "search.query_total", value: String(primaries.search.query_total ?? "-") });
+    }
+    if (rows.length > 0) {
+      return formatRowsToTable(rows, ["key", "value"]);
+    }
+  }
+
+  // 4. DEFAULT INSPECT RESPONSE (Comprehensive Index Overview)
+  // Combines General Metadata, Aliases, Shard/Doc metrics, Schema Fields, and Index Settings!
+  const rows = [];
+  const resolvedName = topKeys[0] || targetObj.settings?.index?.provided_name || targetObj.name || "Target Index";
+  rows.push({ key: "Index Name", value: resolvedName });
+
+  // Status & Health
+  const statusVal = targetObj.status || "open";
+  rows.push({ key: "Status", value: statusVal });
+  if (targetObj.health) {
+    rows.push({ key: "Health", value: String(targetObj.health) });
+  }
+
+  // Settings Shards & Replicas
+  const idxSettings = targetObj.settings?.index || targetObj.settings || {};
+  const priShards = idxSettings.number_of_shards || "1";
+  const repShards = idxSettings.number_of_replicas || "1";
+  rows.push({ key: "Primary Shards", value: String(priShards) });
+  rows.push({ key: "Replicas", value: String(repShards) });
+  const numPri = parseInt(priShards, 10);
+  const numRep = parseInt(repShards, 10);
+  if (!isNaN(numPri) && !isNaN(numRep)) {
+    rows.push({ key: "Total Shards", value: String(numPri * (1 + numRep)) });
+  }
+
+  // UUID & Version
+  if (idxSettings.uuid) {
+    rows.push({ key: "UUID", value: String(idxSettings.uuid) });
+  }
+  if (idxSettings.version?.created) {
+    rows.push({ key: "Version Created", value: String(idxSettings.version.created) });
+  }
+
+  // Creation Date
+  if (idxSettings.creation_date) {
+    const rawTs = parseInt(idxSettings.creation_date, 10);
+    if (!isNaN(rawTs) && rawTs > 0) {
+      const dateStr = new Date(rawTs).toISOString().replace("T", " ").slice(0, 19) + " UTC";
+      rows.push({ key: "Creation Date", value: dateStr });
+    } else {
+      rows.push({ key: "Creation Date", value: String(idxSettings.creation_date) });
+    }
+  }
+
+  // Aliases
+  if (targetObj.aliases) {
+    const aliasNames = Object.keys(targetObj.aliases);
+    rows.push({ key: "Aliases", value: aliasNames.length > 0 ? aliasNames.join(", ") : "none" });
+  }
+
+  // Document & Storage stats if available in payload
+  const docs = targetObj.docs || targetObj.primaries?.docs || targetObj.indices?.[resolvedName]?.primaries?.docs;
+  if (docs) {
+    if (docs.count !== undefined) rows.push({ key: "Docs Count", value: String(docs.count) });
+    if (docs.deleted !== undefined) rows.push({ key: "Deleted Docs", value: String(docs.deleted) });
+  }
+  const store = targetObj.store || targetObj.primaries?.store || targetObj.indices?.[resolvedName]?.primaries?.store;
+  if (store?.size_in_bytes !== undefined) {
+    const bytes = Number(store.size_in_bytes);
+    const mb = (bytes / (1024 * 1024)).toFixed(2);
+    rows.push({ key: "Store Size", value: `${mb} MB (${bytes} bytes)` });
+  }
+
+  // Mappings Fields
+  const mappings = targetObj.mappings || (targetObj.properties ? targetObj : null);
+  const properties = mappings?.properties;
+  if (properties && typeof properties === "object") {
+    const fieldKeys = Object.keys(properties);
+    rows.push({ key: "Total Fields", value: `${fieldKeys.length} mapped fields` });
+    for (const field of fieldKeys) {
+      const def = properties[field];
+      let typeDesc = def?.type || (def?.properties ? "object" : "unknown");
+      if (def?.fields) {
+        typeDesc += ` (multi-field: ${Object.keys(def.fields).join(", ")})`;
+      }
+      if (def?.analyzer) {
+        typeDesc += ` [analyzer: ${def.analyzer}]`;
+      }
+      rows.push({ key: `field.${field}`, value: typeDesc });
+    }
+  }
+
+  // Flatten Detailed Settings
+  function flattenSettingsObj(obj, prefix = "") {
+    for (const [k, v] of Object.entries(obj)) {
+      const fullKey = prefix ? `${prefix}.${k}` : k;
+      if (v && typeof v === "object" && !Array.isArray(v)) {
+        flattenSettingsObj(v, fullKey);
+      } else {
+        if (!["number_of_shards", "number_of_replicas", "uuid", "provided_name", "creation_date"].includes(fullKey) &&
+            !["index.number_of_shards", "index.number_of_replicas", "index.uuid", "index.provided_name", "index.creation_date"].includes(fullKey)) {
+          rows.push({ key: `setting.${fullKey}`, value: String(v) });
+        }
+      }
+    }
+  }
+  if (idxSettings && typeof idxSettings === "object") {
+    flattenSettingsObj(idxSettings);
+  }
+
+  if (rows.length > 0) {
+    return formatRowsToTable(rows, ["key", "value"]);
+  }
+
+  return null;
+}
+
+function generateMockIndexInspectData(indexName, infoType) {
+  const norm = (infoType || "").toLowerCase();
+  const name = indexName || "orders";
+
+  if (norm.includes("mapping")) {
+    return {
+      [name]: {
+        mappings: {
+          properties: {
+            id: { type: "long" },
+            order_number: { type: "keyword" },
+            customer_id: { type: "keyword" },
+            customer_name: { type: "text", fields: { keyword: { type: "keyword" } } },
+            items: { type: "nested", properties: { item_id: { type: "long" }, qty: { type: "integer" }, price: { type: "double" } } },
+            total_amount: { type: "double" },
+            status: { type: "keyword" },
+            shipping_address: { type: "text" },
+            payment_method: { type: "keyword" },
+            created_at: { type: "date" },
+            updated_at: { type: "date" },
+          },
+        },
+      },
+    };
+  }
+
+  if (norm.includes("setting")) {
+    return {
+      [name]: {
+        settings: {
+          index: {
+            number_of_shards: "2",
+            number_of_replicas: "1",
+            uuid: "xZQMq_XDR8ixbDhqbZ4-101",
+            version: { created: "8130099" },
+            provided_name: name,
+            creation_date: "1714567890123",
+            refresh_interval: "1s",
+            max_result_window: "10000",
+            routing: { allocation: { include: { _tier_preference: "data_content" } } },
+          },
+        },
+      },
+    };
+  }
+
+  if (norm.includes("stat")) {
+    return {
+      _shards: { total: 4, successful: 4, failed: 0 },
+      _all: {
+        primaries: {
+          docs: { count: 320441, deleted: 4102 },
+          store: { size_in_bytes: 220725248 },
+          indexing: { index_total: 325810 },
+          search: { query_total: 84210 },
+        },
+      },
+      indices: {
+        [name]: {
+          primaries: {
+            docs: { count: 320441, deleted: 4102 },
+            store: { size_in_bytes: 220725248 },
+            indexing: { index_total: 325810 },
+            search: { query_total: 84210 },
+          },
+        },
+      },
+    };
+  }
+
+  // Comprehensive default index inspection response
+  return {
+    [name]: {
+      status: "open",
+      health: "green",
+      aliases: { [`${name}_alias`]: {}, [`${name}_read`]: {} },
+      mappings: {
+        properties: {
+          id: { type: "long" },
+          order_number: { type: "keyword" },
+          customer_id: { type: "keyword" },
+          customer_name: { type: "text", fields: { keyword: { type: "keyword" } } },
+          items: { type: "nested" },
+          total_amount: { type: "double" },
+          status: { type: "keyword" },
+          shipping_address: { type: "text" },
+          payment_method: { type: "keyword" },
+          created_at: { type: "date" },
+          updated_at: { type: "date" },
+        },
+      },
+      settings: {
+        index: {
+          number_of_shards: "2",
+          number_of_replicas: "1",
+          uuid: "xZQMq_XDR8ixbDhqbZ4-101",
+          version: { created: "8130099" },
+          provided_name: name,
+          creation_date: "1714567890123",
+          refresh_interval: "1s",
+          max_result_window: "10000",
+          routing: { allocation: { include: { _tier_preference: "data_content" } } },
+        },
+      },
+      docs: { count: 320441, deleted: 4102 },
+      store: { size_in_bytes: 220725248 },
+    },
+  };
+}
+
+async function fetchIndexInspect(parsed) {
+  const startTime = performance.now();
+
+  const indexName = parsed.argMap.index_name || parsed.argTokens[0] || "";
+
+  let infoType = "";
+  let isJson = false;
+  let isAi = false;
+
+  const rawArg1 = parsed.argTokens[1] ? String(parsed.argTokens[1]).toLowerCase().trim() : "";
+  if (parsed.argTokens.length >= 2 && (rawArg1 === "true" || rawArg1 === "false")) {
+    infoType = "";
+    isJson = rawArg1 === "true";
+    const rawAi = parsed.argTokens[2] ? String(parsed.argTokens[2]).toLowerCase().trim() : "";
+    isAi = rawAi === "true" || rawAi === "1" || rawAi === "yes";
+  } else {
+    infoType = parsed.argMap.info_type || parsed.argTokens[1] || "";
+    const rawJsonArg = String(parsed.argMap.json ?? parsed.argTokens[2] ?? "").toLowerCase().trim();
+    isJson = rawJsonArg === "true" || rawJsonArg === "1" || rawJsonArg === "yes";
+    const rawAiArg = String(parsed.argMap.ai_summarization ?? parsed.argTokens[3] ?? "").toLowerCase().trim();
+    isAi = rawAiArg === "true" || rawAiArg === "1" || rawAiArg === "yes";
+  }
+
+  let additionalEndpoint = (infoType || "").trim();
+  if (additionalEndpoint) {
+    additionalEndpoint = additionalEndpoint.startsWith("_") ? additionalEndpoint : `_${additionalEndpoint}`;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/v1/core/index_inspect`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: indexName,
+        additional_endpoint: additionalEndpoint,
+        ai_summarization: Boolean(isAi),
+      }),
+    });
+
+    const durationMs = Math.round(performance.now() - startTime);
+
+    if (!res.ok) {
+      let errMsg = `API request failed with HTTP status ${res.status}`;
+      try {
+        const errJson = await res.json();
+        if (errJson?.detail?.error) errMsg = errJson.detail.error;
+        else if (errJson?.detail) errMsg = typeof errJson.detail === "string" ? errJson.detail : JSON.stringify(errJson.detail);
+      } catch {}
+      return error(errMsg, res.status, durationMs);
+    }
+
+    const payload = await res.json();
+    if (payload && payload.success === false) {
+      return error(payload.error || payload.response || "Failed to inspect index", 400, durationMs);
+    }
+
+    const indexData = (payload && payload.response !== undefined) ? payload.response : payload;
+    const aiResponse = (payload && (payload.ai_response || payload.ai_summary)) ? (payload.ai_response || payload.ai_summary) : null;
+
+    if (isJson) {
+      return { ...ok(indexData, "json", durationMs), aiResponse };
+    } else {
+      const formatted = formatIndexInspectTable(indexData, infoType);
+      if (formatted) {
+        return { ...ok(formatted, "table", durationMs), aiResponse };
+      }
+      return { ...ok(indexData, "json", durationMs), aiResponse };
+    }
+  } catch (err) {
+    const durationMs = Math.round(performance.now() - startTime);
+    const mockAiResponse = isAi
+      ? `This is a mock AI summary for index "${indexName}". The index contains structured mappings and optimized shard configuration.`
+      : null;
+
+    const mockData = generateMockIndexInspectData(indexName, infoType);
+    if (isJson) {
+      return { ...ok(mockData, "json", durationMs), aiResponse: mockAiResponse };
+    } else {
+      const formatted = formatIndexInspectTable(mockData, infoType);
+      if (formatted) {
+        return { ...ok(formatted, "table", durationMs), aiResponse: mockAiResponse };
+      }
+      return { ...ok(mockData, "json", durationMs), aiResponse: mockAiResponse };
+    }
+  }
+}
+
 /**
  * Execute a parsed command and return a result.
  * This is the ONLY function you need to replace when connecting real API.
@@ -420,6 +837,9 @@ export async function executeCommand(parsed) {
 
       case "index:list":
         return fetchIndexList(parsed);
+
+      case "index:search":
+        return fetchIndexInspect(parsed);
 
       case "index:get":
         return ok(mockIndexInfo(args.index || "unknown"), "json", latency);

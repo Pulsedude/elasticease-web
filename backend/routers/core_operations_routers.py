@@ -4,7 +4,8 @@ from .models import (
     LoginCredentials,
     AIInferenceUpdate,
     URLUpdate,
-    PromptForAI
+    PromptForAI,
+    IndexDetails
 )
 import config
 import json
@@ -15,7 +16,7 @@ coreops = CoreOps()
 
 @router.get("/latency", status_code=status.HTTP_200_OK)
 def see_latency_of_api():
-    """Return the latency of Elasticsearch API 
+    """Return the latency of Elasticsearch API
     """
     try:
         elasticsearch_api_latency = coreops.ping_of_elastic_api()
@@ -150,7 +151,7 @@ def see_total_number_active_nodes(ai_response: bool = False):
 
 @router.get("/indices", status_code=status.HTTP_200_OK)
 def see_all_indices(ai_response: bool = False):
-    """Return the total number indices on active nodes 
+    """Return the total number indices on active nodes
     """
     try:
         get_indices = coreops.indices(ai_response)
@@ -177,7 +178,7 @@ def get_ai_configuration():
     """Return current selected AI inference provider and config from config.yaml"""
     try:
         cfg = config.read()
-        
+
         if isinstance(cfg, tuple):
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": cfg[1]})
@@ -211,7 +212,7 @@ def update_ai_inference(body: AIInferenceUpdate):
             cfg["elasticease_web"] = {}
 
         provider = body.provider.lower().strip()
-        
+
         if provider not in ["ollama", "litellm"]:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -247,7 +248,7 @@ def update_ai_inference(body: AIInferenceUpdate):
 
 @router.put("/update_elastic_url", status_code=status.HTTP_200_OK)
 def update_elastic_base_url(body: URLUpdate):
-    """Update existing Elasticsearch request URL with new Base URL 
+    """Update existing Elasticsearch request URL with new Base URL
     """
     try:
         cfg = config.read()
@@ -257,7 +258,7 @@ def update_elastic_base_url(body: URLUpdate):
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": cfg[1]})
 
         new_base_url = body.base_url
-        
+
         if not new_base_url.startswith(("http://", "https://")):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail={
@@ -271,7 +272,7 @@ def update_elastic_base_url(body: URLUpdate):
         if isinstance(write_cfg, tuple):
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": write_cfg[1]})
-        
+
         return {
             "success": True,
             "elastic url": new_base_url,
@@ -284,8 +285,8 @@ def update_elastic_base_url(body: URLUpdate):
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": str(e)})
-        
-        
+
+
 @router.put("/update_backend_url", status_code=status.HTTP_200_OK)
 def update_backend_base_url(body: URLUpdate):
     """Update existing backend API base url with new base URL
@@ -298,7 +299,7 @@ def update_backend_base_url(body: URLUpdate):
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": cfg[1]})
 
         new_base_url = body.base_url
-        
+
         if not new_base_url.startswith(("http://", "https://")):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail={
@@ -312,7 +313,7 @@ def update_backend_base_url(body: URLUpdate):
         if isinstance(write_cfg, tuple):
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": write_cfg[1]})
-        
+
         return {
             "success": True,
             "backend url": new_base_url,
@@ -329,21 +330,46 @@ def update_backend_base_url(body: URLUpdate):
 
 @router.post("/ai_summarization", status_code=status.HTTP_200_OK)
 def ask_ai_to_summarize_data(body: PromptForAI):
+    """Special endpoint used to send data summarization request to Model
+    """
     try:
         ai_response = coreops.ask_ai(body.prompt)
-        
+
         if isinstance(ai_response, tuple):
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": ai_response[1]})
-        
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={
+                                "error": ai_response[1]})
+
         return {
             "success": True,
             "ai_response": True,
             "response": ai_response
         }
-    
+
     except HTTPException:
         raise
-    
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": str(e)})
+
+
+@router.post("/index_inspect", status_code=status.HTTP_200_OK)
+def see_specific_index_details(body: IndexDetails):
+    """Retrieve the details of specific index (default response is core details of index)
+    """
+    try:
+        index_details = coreops.index_info(
+            body.name, body.additional_endpoint, body.ai_summarization)
+
+        if isinstance(index_details, tuple):
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={
+                                "error": index_details[1]})
+
+        return index_details
+
+    except HTTPException:
+        raise
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": str(e)})

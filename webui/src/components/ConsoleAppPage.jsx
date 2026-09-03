@@ -1,4 +1,4 @@
-﻿import React, {
+import React, {
   useState,
   useRef,
   useEffect,
@@ -62,7 +62,7 @@ export default function ConsoleAppPage({ theme }) {
         const argDef = parsed.definition.arguments[argIdx];
         const partial = parsed.argTokens[argIdx] ?? "";
 
-        const argSugg = argDef.type === "enum"
+        const argSugg = (argDef.type === "enum" || (argDef.options && argDef.options.length > 0))
           ? (argDef.options ?? []).filter(o => o.toLowerCase().includes(partial.toLowerCase()))
           : getArgumentSuggestions(parsed.commandName, argDef.name, argDef.type, partial);
 
@@ -97,15 +97,41 @@ export default function ConsoleAppPage({ theme }) {
       const def = commandSuggestions.find(s => s.command.name === value)?.command;
       const suffix = def && def.arguments.length > 0 ? " " : "";
       setInputValue(value + suffix);
+      setActiveArgIndex(0);
     } else {
-      const tokens = [...parsed.argTokens];
-      const calcIdx = currentArgIndex(parsed, inputValue);
-      const targetIdx = activeArgIndex >= 0 ? activeArgIndex : Math.max(0, calcIdx);
+      const targetIdx = activeArgIndex >= 0 ? activeArgIndex : Math.max(0, currentArgIndex(parsed, inputValue));
+      const maxLen = Math.max(parsed.definition?.arguments?.length || 0, (parsed?.argTokens || []).length, targetIdx + 1);
+      const tokens = [];
+      for (let i = 0; i < maxLen; i++) {
+        tokens.push(parsed?.argTokens?.[i] ?? "");
+      }
       tokens[targetIdx] = value;
 
+      let lastNonEmptyIdx = -1;
+      for (let i = tokens.length - 1; i >= 0; i--) {
+        if (tokens[i] !== undefined && String(tokens[i]).trim() !== "") {
+          lastNonEmptyIdx = i;
+          break;
+        }
+      }
+
       const cmdName = parsed.commandName;
-      const formattedTokens = tokens.map(t => (t && t.includes(" ") && !t.startsWith('"')) ? `"${t}"` : t);
-      setInputValue(`${cmdName} ${formattedTokens.join(" ")}`);
+      if (lastNonEmptyIdx === -1) {
+        setInputValue(`${cmdName} `);
+      } else {
+        const formattedTokens = [];
+        for (let i = 0; i <= lastNonEmptyIdx; i++) {
+          const t = String(tokens[i] ?? "");
+          if (t === "") {
+            formattedTokens.push('""');
+          } else if (t.includes(" ") && !t.startsWith('"')) {
+            formattedTokens.push(`"${t}"`);
+          } else {
+            formattedTokens.push(t);
+          }
+        }
+        setInputValue(`${cmdName} ${formattedTokens.join(" ")}`);
+      }
     }
     setSuggestionActiveIndex(-1);
     setShowSuggestions(true);
@@ -153,6 +179,7 @@ export default function ConsoleAppPage({ theme }) {
     } finally {
       setLoadingCommand(null);
       setInputValue("");
+      setActiveArgIndex(-1);
       setSuggestionActiveIndex(-1);
       setShowSuggestions(true);
       setTimeout(() => inputRef.current?.focus(), 0);
@@ -200,6 +227,7 @@ export default function ConsoleAppPage({ theme }) {
 
   const handleQuickInsert = useCallback((cmd) => {
     setInputValue(cmd + " ");
+    setActiveArgIndex(0);
     setShowSuggestions(true);
     setSuggestionActiveIndex(-1);
     setValidationError(null);
@@ -210,6 +238,7 @@ export default function ConsoleAppPage({ theme }) {
     const d = getCommand(cmdName);
     const suffix = d && d.arguments.length > 0 ? " " : "";
     setInputValue(cmdName + suffix);
+    setActiveArgIndex(0);
     setShowSuggestions(true);
     setSuggestionActiveIndex(-1);
     setValidationError(null);

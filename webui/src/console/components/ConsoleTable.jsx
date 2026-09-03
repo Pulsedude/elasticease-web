@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 
 /**
  * Parse raw table text (space-separated or key-value) into structured rows & headers.
@@ -15,8 +15,8 @@ export function parseTableText(raw) {
 
   const headerLine = lines[0];
 
-  // Detect Key-Value table (e.g. METRIC VALUE or KEY VALUE)
-  const isKeyValue = /^METRIC\s+VALUE/i.test(headerLine) || /^KEY\s+VALUE/i.test(headerLine);
+  // Detect Key-Value table (e.g. METRIC VALUE, KEY VALUE, PROPERTY VALUE, SETTING VALUE)
+  const isKeyValue = /^METRIC\s+VALUE/i.test(headerLine) || /^KEY\s+VALUE/i.test(headerLine) || /^PROPERTY\s+VALUE/i.test(headerLine) || /^SETTING\s+VALUE/i.test(headerLine);
 
   if (isKeyValue) {
     const rows = [];
@@ -86,11 +86,11 @@ export default function ConsoleTable({ rawData }) {
     return null;
   }
 
-  // ── 1. KEY-VALUE TABLE (e.g. cluster:health) ──
+  // ── 1. KEY-VALUE TABLE (e.g. cluster:health, index:search) ──
   if (parsed.type === "key-value") {
-    const statusRow = parsed.rows.find(r => r.metric.toLowerCase() === "status");
-    const clusterNameRow = parsed.rows.find(r => r.metric.toLowerCase() === "cluster name");
-    const otherRows = parsed.rows.filter(r => r.metric.toLowerCase() !== "status" && r.metric.toLowerCase() !== "cluster name");
+    const statusRow = parsed.rows.find(r => ["status", "health"].includes(r.metric.toLowerCase()));
+    const titleRow = parsed.rows.find(r => ["cluster name", "index name", "index", "name"].includes(r.metric.toLowerCase()));
+    const otherRows = parsed.rows.filter(r => r !== statusRow && r !== titleRow);
 
     return (
       <div className="con-kv-widget">
@@ -98,7 +98,7 @@ export default function ConsoleTable({ rawData }) {
         <div className="con-kv-header">
           <div className="con-kv-title">
             <span className="con-kv-icon">⚡</span>
-            <span className="con-kv-name">{clusterNameRow ? clusterNameRow.value : "Elasticsearch Cluster"}</span>
+            <span className="con-kv-name">{titleRow ? titleRow.value : (statusRow ? "Index Details" : "Elasticsearch Cluster")}</span>
           </div>
           {statusRow && <StatusBadge val={statusRow.value} />}
         </div>
