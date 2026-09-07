@@ -27,3 +27,10 @@ class IndexDetails(BaseModel):
     name: str 
     additional_endpoint: str = ""
     ai_summarization: bool = False
+    
+
+class NewIndex(BaseModel):
+    model_config = ConfigDict(strict=True)
+    index_name: str
+    with_mapping: bool = False
+    mapping: dict = {}
