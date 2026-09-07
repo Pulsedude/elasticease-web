@@ -10,6 +10,7 @@ from pathlib import Path
 
 # routers
 from routers import core_operations_routers
+from routers import crud_operations_routers
 
 app = FastAPI(
     title="elasticease",
@@ -69,3 +70,4 @@ def redirection_to_openapi_documentation():
 
 # core operation routers (endpoints) ---------------------
 app.include_router(core_operations_routers.router)
+app.include_router(crud_operations_routers.router)
