@@ -1,6 +1,7 @@
 from config import read
-import requests
+import request
 import urllib3
+import requests
 import time
 
 # AI inferences
@@ -12,36 +13,19 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 class CoreOps:
     def __init__(self):
-        config_read = read()
-
-        self.configuration = None if isinstance(
-            config_read, tuple) else config_read
-
-        self.elastic_username = self.configuration.get("elasticease_web").get(
-            "elasticsearch").get("username") if self.configuration else None
-
-        self.elastic_password = self.configuration.get("elasticease_web").get(
-            "elasticsearch").get("password") if self.configuration else None
-
-        self.elastic_base_url = self.configuration.get("elasticease_web").get(
-            "elasticsearch").get("base_url") if self.configuration else None
-
-        self.verify_certs = self.configuration.get("elasticease_web").get(
-            "elasticsearch").get("verify_certs") if self.configuration else None
-
-        self.auth = (self.elastic_username, self.elastic_password)
-
+        configuration = read()
+        
         # get selected AI-Inference (provider)
-        self.selected_ai_inference = self.configuration.get("elasticease_web").get(
-            "selected_ai_inference") if self.configuration else None
+        self.selected_ai_inference = configuration.get("elasticease_web").get(
+            "selected_ai_inference") if configuration else None
 
         # AI inferences instances
         self.ollama = Ollama()
         self.litellm = LiteLLM()
 
         # AI mode switch
-        self.ai_mode = self.configuration.get("elasticease_web").get(
-            "ai_mode") if self.configuration else None
+        self.ai_mode = configuration.get("elasticease_web").get(
+            "ai_mode") if configuration else None
 
     def check_ai_mode(self):
         """Check whether AI Mode is toggled On or Off
@@ -72,40 +56,7 @@ class CoreOps:
 
         except Exception as e:
             return (False, str(e))
-
-    def make_request(self, path: str = ""):
-        """Base request method to make request on target path
-        """
-        try:
-            if not self.elastic_base_url:
-                return {
-                    "success": False,
-                    "error": "Elasticsearch base url not provided!"
-                }
-
-            url = f"{self.elastic_base_url.rstrip('/')}/{path.lstrip('/')}" if path else self.elastic_base_url.rstrip(
-                '/')
-
-            start = time.perf_counter()
-
-            response = requests.get(
-                url,
-                timeout=10,
-                auth=self.auth,
-                verify=self.verify_certs
-            )
-
-            end = time.perf_counter()
-
-            if response.status_code == 401:
-                return {"success": False, "status": "alive", "response": "failed to authorize"}
-
-            return {"success": True, "status": "alive", "response": response.json(), "latency": f"{((end - start) * 1000):.3f}"}
-        except Exception as e:
-            return {
-                "success": False,
-                "error": str(e)
-            }
+        
 
     def ping_of_elastic_api(self):
         """Return the latency of elasticsearch API
@@ -114,7 +65,7 @@ class CoreOps:
             start = time.perf_counter()
 
             # response from elasticsearch API
-            res = self.make_request()
+            res = request.get()
 
             end = time.perf_counter()
 
@@ -158,7 +109,7 @@ class CoreOps:
         """check the active cluster status (health)
         """
         try:
-            response = self.make_request("_cluster/health")
+            response = request.get("_cluster/health")
 
             return response
 
@@ -172,7 +123,7 @@ class CoreOps:
         """Return the all available active shards. Cluster -> Node -> Shards
         """
         try:
-            response = self.make_request("_cat/shards?format=json")
+            response = request.get("_cat/shards?format=json")
 
             if ai_summarization:
                 # check whether AI Mode is On of Off
@@ -218,7 +169,7 @@ class CoreOps:
         """Return the all available indices
         """
         try:
-            response = self.make_request("_cat/indices?format=json")
+            response = request.get("_cat/indices?format=json")
 
             if ai_summarization:
                 # check whether AI Mode is On of Off
@@ -264,7 +215,7 @@ class CoreOps:
         """Return total number active nodes on the running cluster with their information
         """
         try:
-            response = self.make_request("_cat/nodes?format=json")
+            response = request.get("_cat/nodes?format=json")
 
             if ai_summarization:
                 # check whether AI Mode is On of Off
@@ -310,10 +261,12 @@ class CoreOps:
         """Retrieve the details of specific index (default response is core details of index) 
         """
         try:
-            index = index_name.strip("/") if index_name.endswith("/") or index_name.startswith("/") else index_name
-            additional_info_type = additional_endpoint.strip("/") if additional_endpoint.endswith("/") or additional_endpoint.startswith("/") else additional_endpoint
-            
-            response = self.make_request(f"{index}/{additional_info_type}")
+            index = index_name.strip(
+                "/") if index_name.endswith("/") or index_name.startswith("/") else index_name
+            additional_info_type = additional_endpoint.strip("/") if additional_endpoint.endswith(
+                "/") or additional_endpoint.startswith("/") else additional_endpoint
+
+            response = request.get(f"{index}/{additional_info_type}")
 
             if ai_summarization:
                 # check whether AI Mode is On of Off
@@ -353,5 +306,80 @@ class CoreOps:
         except Exception as e:
             return {
                 "success": False,
+                "error": str(e)
+            }
+
+    def master_node(self):
+        """Retrieve the master node information
+        """
+        try:
+            response = request.get("_cat/nodes?format=json")
+
+            if response.get("response") == "failed to authorize":
+                return response
+
+            master_node = {}
+
+            for node in response.get("response"):
+                if node["master"] == "*":
+                    master_node = node
+                    break
+
+            return {
+                "success": True,
+                "response": master_node,
+                "latency":  response.get("latency")
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    def allocation(self, ai_summarization: bool):
+        """Retrieve the information of total allocation of size of each node and available storage
+        """
+        try:
+            response = request.get("_cat/allocation?format=json")
+
+            if ai_summarization:
+                # check whether AI Mode is On of Off
+
+                ai_mode = self.check_ai_mode()
+                if not ai_mode:
+                    return response
+
+                # check api response if it is an error then take action further on it
+                if response.get("success") is False:
+                    return response
+
+                # ask AI-Model
+                ai_summary = self.ask_ai(
+                    f"{response.get('response')}\n\nHere is the some data of elastic nodes in which having their some information about total storage size allocation and etc. So please summarize the this given data. (start direclty from explaination with NO EXTRA SINGLE LINE UNSUAL ANSWER)")
+
+                if isinstance(ai_summary, tuple):
+                    return {
+                        "success": True,
+                        "status": "alive",
+                        "ai_summary": "error",
+                        "response": response.get("response"),
+                        "latency": response.get("latency")
+                    }
+
+                return {
+                    "success": True,
+                    "status": "alive",
+                    "ai_summary": ai_summary,
+                    "response": response.get("response"),
+                    # elastic API latency
+                    "latency": response.get("latency")
+                }
+
+            return response
+
+        except Exception as e:
+            return {
+                "success": True,
                 "error": str(e)
             }

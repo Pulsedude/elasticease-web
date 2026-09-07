@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status, Response
+from fastapi import APIRouter, HTTPException, status
 from core_operations import CoreOps
 from .models import (
     LoginCredentials,
@@ -8,7 +8,6 @@ from .models import (
     IndexDetails
 )
 import config
-import json
 
 router = APIRouter(prefix="/v1/core")
 coreops = CoreOps()
@@ -19,21 +18,21 @@ def see_latency_of_api():
     """Return the latency of Elasticsearch API
     """
     try:
-        elasticsearch_api_latency = coreops.ping_of_elastic_api()
+        elastic_api_ping = coreops.ping_of_elastic_api()
 
-        if elasticsearch_api_latency.get("success") is False and elasticsearch_api_latency.get("response") == "failed to authorize":
-            return Response(
+        if elastic_api_ping.get("success") is False and elastic_api_ping.get("response") == "failed to authorize":
+            return HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                content=json.dumps(elasticsearch_api_latency),
-                media_type="application/json"
+                detail={"error": elastic_api_ping.get("response")},
             )
-        if elasticsearch_api_latency.get("success") is False:
+
+        if elastic_api_ping.get("success") is False:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=elasticsearch_api_latency
+                detail=elastic_api_ping
             )
 
-        return elasticsearch_api_latency
+        return elastic_api_ping
 
     except HTTPException:
         raise
@@ -54,12 +53,11 @@ def authorization(credentials: LoginCredentials):
             credentials.username, credentials.password)
 
         if auth_check.get("success") is False and auth_check.get("response") == "failed to authorize":
-            return Response(
+            return HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                content=json.dumps(auth_check),
-                media_type="application/json"
-
+                detail={"error": auth_check.get("response")},
             )
+
         if auth_check.get("success") is False:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -90,7 +88,10 @@ def to_check_the_active_cluster_status():
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=cluster_health)
 
         if cluster_health.get("success") is False and cluster_health.get("response") == "failed to authorize":
-            return Response(status_code=status.HTTP_403_FORBIDDEN, content=json.dumps(cluster_health), media_type="application/json")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={"error": cluster_health.get("response")},
+            )
 
         return cluster_health
 
@@ -113,7 +114,10 @@ def see_total_number_of_available_shards(ai_response: bool = False):
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=get_shards)
 
         if get_shards.get("success") is False and get_shards.get("response") == "failed to authorize":
-            return Response(status_code=status.HTTP_403_FORBIDDEN, content=json.dumps(get_shards), media_type="application/json")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={"error": get_shards.get("response")},
+            )
 
         return get_shards
 
@@ -137,7 +141,10 @@ def see_total_number_active_nodes(ai_response: bool = False):
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=get_nodes)
 
         if get_nodes.get("success") is False and get_nodes.get("response") == "failed to authorize":
-            return Response(status_code=status.HTTP_403_FORBIDDEN, content=json.dumps(get_nodes), media_type="application/json")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={"error": get_nodes.get("response")},
+            )
 
         return get_nodes
 
@@ -161,7 +168,8 @@ def see_all_indices(ai_response: bool = False):
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=get_indices)
 
         if get_indices.get("success") is False and get_indices.get("response") == "failed to authorize":
-            return Response(status_code=status.HTTP_403_FORBIDDEN, content=json.dumps(get_indices), media_type="application/json")
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={
+                                "error": get_indices.get("response")})
 
         return get_indices
 
@@ -366,6 +374,56 @@ def see_specific_index_details(body: IndexDetails):
                                 "error": index_details[1]})
 
         return index_details
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": str(e)})
+
+
+@router.get("/master_node", status_code=status.HTTP_200_OK)
+def master_node_info():
+    """Retrieve the master node information 
+    """
+    try:
+        master_node_info = coreops.master_node()
+
+        if master_node_info.get("response") == "failed to authorize":
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail={
+                                "error": "failed to authorize"})
+
+        if master_node_info.get("success") is False:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={
+                                "error": master_node_info.get("error")})
+
+        return master_node_info
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": str(e)})
+
+
+@router.post("/allocation", status_code=status.HTTP_200_OK)
+def nodes_disk_allocation(ai_summarization: bool = False):
+    """Retrieve the active nodes disk allocation data
+    """
+    try:
+        allocation_data = coreops.allocation(ai_summarization)
+
+        if allocation_data.get("response") == "failed to authorize":
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail={
+                                "error": "failed to authorize"})
+
+        if allocation_data.get("success") is False:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={
+                                "error": allocation_data.get("error")})
+
+        return allocation_data
 
     except HTTPException:
         raise
