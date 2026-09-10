@@ -34,3 +34,16 @@ class NewIndex(BaseModel):
     index_name: str
     with_mapping: bool = False
     mapping: dict = {}
+
+
+class NewDocument(BaseModel):
+    model_config = ConfigDict(strict=True)
+    index_name: str
+    id: str = ""
+    document: dict
+
+
+class IndexDataInspect(BaseModel):
+    model_config = ConfigDict(strict=True)
+    index_name: str
+    size: str = "100"
