@@ -33,3 +33,44 @@ class CrudOps:
                 "error": str(e),
             }
 
+    def delete_index(self, name: str):
+        """Delete any such existing index
+        """
+        try:
+            response = request.delete(name)
+
+            return response
+
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    def insert_doc(self, index: str, id: str, document: dict):
+        """Insert new document into existing index
+        """
+        try:
+            response = request.post(f"{index}/_doc/{id}", document)
+
+            return response
+
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    def index_data_inspect(self, name: str, size: str):
+        """Return the index along with their stored data (documents)
+        """
+        try:
+            response = request.get(f"{name}/_search/?size={size}")
+
+            return response
+                
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }
