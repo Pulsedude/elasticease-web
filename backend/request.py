@@ -48,9 +48,16 @@ def get(endpoint: str = ".") -> dict:
 
         if response.status_code == 401:
             return {
-                "succcess": False,
+                "success": False,
                 "status": "alive",
                 "response": "failed to authorize"
+            }
+
+        if "error" in response.json():
+            return {
+                "success": False,
+                "status": "alive",
+                "response": response.json().get("error")
             }
 
         return {
@@ -84,7 +91,7 @@ def post(endpoint: str, data: dict) -> dict:
         data = data
 
         start = time.perf_counter()
-        
+
         response = requests.post(
             url=base_url,
             json=data,
@@ -94,28 +101,35 @@ def post(endpoint: str, data: dict) -> dict:
         )
 
         end = time.perf_counter()
-        
+
         if response.status_code == 401:
             return {
-                "succcess": False,
+                "success": False,
                 "status": "alive",
                 "response": "failed to authorize"
             }
-            
+
+        if "error" in response.json():
+            return {
+                "success": False,
+                "status": "alive",
+                "response": response.json().get("error")
+            }
+
         return {
             "success": True,
             "status": "alive",
             "response": response.json(),
             "latency": f"{((end - start) * 1000):.3f}"
         }
-        
+
     except Exception as e:
         return {
             "success": False,
             "error": str(e)
         }
-        
-        
+
+
 def put(endpoint: str, data: dict) -> dict:
     """Make PUT request to elastic API 
     """
@@ -133,7 +147,7 @@ def put(endpoint: str, data: dict) -> dict:
         data = data
 
         start = time.perf_counter()
-        
+
         response = requests.put(
             url=base_url,
             json=data,
@@ -143,28 +157,35 @@ def put(endpoint: str, data: dict) -> dict:
         )
 
         end = time.perf_counter()
-        
+
         if response.status_code == 401:
             return {
-                "succcess": False,
+                "success": False,
                 "status": "alive",
                 "response": "failed to authorize"
             }
-            
+
+        if "error" in response.json():
+            return {
+                "success": False,
+                "status": "alive",
+                "response": response.json().get("error")
+            }
+
         return {
             "success": True,
             "status": "alive",
             "response": response.json(),
             "latency": f"{((end - start) * 1000):.3f}"
         }
-        
+
     except Exception as e:
         return {
             "success": False,
             "error": str(e)
         }
-        
-        
+
+
 def delete(endpoint: str) -> dict:
     """Make DELETE request to elastic API 
     """
@@ -180,7 +201,7 @@ def delete(endpoint: str) -> dict:
                 "/") else elastic_base_url + endpoint
 
         start = time.perf_counter()
-        
+
         response = requests.delete(
             url=base_url,
             auth=(elastic_username, elastic_pass),
@@ -189,21 +210,28 @@ def delete(endpoint: str) -> dict:
         )
 
         end = time.perf_counter()
-        
+
         if response.status_code == 401:
             return {
-                "succcess": False,
+                "success": False,
                 "status": "alive",
                 "response": "failed to authorize"
             }
-            
+
+        if "error" in response.json():
+            return {
+                "success": False,
+                "status": "alive",
+                "response": response.json().get("error")
+            }
+
         return {
             "success": True,
             "status": "alive",
             "response": response.json(),
             "latency": f"{((end - start) * 1000):.3f}"
         }
-        
+
     except Exception as e:
         return {
             "success": False,
