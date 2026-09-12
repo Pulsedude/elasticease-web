@@ -25,7 +25,7 @@ class PromptForAI(BaseModel):
 class IndexDetails(BaseModel):
     model_config = ConfigDict(strict=True)
     name: str 
-    additional_endpoint: str = ""
+    info_type: str = ""
     ai_summarization: bool = False
     
 
@@ -39,7 +39,7 @@ class NewIndex(BaseModel):
 class NewDocument(BaseModel):
     model_config = ConfigDict(strict=True)
     index_name: str
-    id: str = ""
+    document_id: str = ""
     document: dict
 
 
@@ -47,3 +47,9 @@ class IndexDataInspect(BaseModel):
     model_config = ConfigDict(strict=True)
     index_name: str
     size: str = "100"
+
+class UpdatedDocument(BaseModel):
+    model_config = ConfigDict(strict=True)
+    index_name: str
+    document_id: str
+    document: dict
