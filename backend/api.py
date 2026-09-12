@@ -22,7 +22,6 @@ app = FastAPI(
 
 # logger
 parent_directory = Path(__file__).resolve().parent.parent
-print(parent_directory)
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s', filemode='a', filename=f"./{parent_directory}/log/api.log")
 logger = logging.getLogger(__name__)

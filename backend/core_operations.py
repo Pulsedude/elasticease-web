@@ -14,49 +14,60 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 class CoreOps:
     def __init__(self):
         configuration = read()
-        
+
         # get selected AI-Inference (provider)
         self.selected_ai_inference = configuration.get("elasticease_web").get(
-            "selected_ai_inference") if configuration else None
+            "selected_ai_inference") if configuration else configuration
 
-        # AI inferences instances
+        # AI inference instances
         self.ollama = Ollama()
         self.litellm = LiteLLM()
 
         # AI mode switch
         self.ai_mode = configuration.get("elasticease_web").get(
-            "ai_mode") if configuration else None
+            "ai_mode") if configuration else configuration
 
-    def check_ai_mode(self):
-        """Check whether AI Mode is toggled On or Off
-        """
-        if self.ai_mode:
-            return True
-        return False
-
-    def ask_ai(self, prompt):
-        """Ask AI-Model according by sending request according to selected AI-Inference (provider)
+    def ask_ai(self, prompt: str):
+        """Ask model on specific query according to selected AI-Inference (Provider)
         """
         try:
-            response = ""
+            if isinstance(self.ai_mode, tuple):
+                return (False, self.ai_mode[1])
+            
+            else:
+                if not self.ai_mode:
+                    return (False, "Please toggle on ai_mode from configuration to get AI-powered responses")
+            
+            
+            if isinstance(self.selected_ai_inference, tuple):
+                return (False, self.selected_ai_inference[1])
+
+            if isinstance(self.ai_mode, tuple):
+                return (False, self.ai_mode[1])
 
             if self.selected_ai_inference.lower() == "ollama":
-                response = self.ollama.ask(prompt)
+                # ask model using Ollama
+                model_res = self.ollama.ask(prompt)
+
+                if isinstance(model_res, tuple):
+                    return (False, model_res[1])
+
+                return model_res
 
             elif self.selected_ai_inference.lower() == "litellm":
-                response = self.litellm.ask(prompt)
+                # ask model using LiteLLM
+                model_res = self.litellm.ask(prompt)
+
+                if isinstance(model_res, tuple):
+                    return (False, model_res[1])
+
+                return model_res
 
             else:
-                return (False, "Unknown inference selected!")
-
-            if isinstance(response, tuple):
-                return (False, response[1])
-
-            return response
+                return (False, "Unkown AI-Inference (Provider) selected!")
 
         except Exception as e:
             return (False, str(e))
-        
 
     def ping_of_elastic_api(self):
         """Return the latency of elasticsearch API
@@ -124,17 +135,11 @@ class CoreOps:
         """
         try:
             response = request.get("_cat/shards?format=json")
+            
+            if response.get("success") is False:
+                return response
 
             if ai_summarization:
-                # check whether AI Mode is On of Off
-
-                # check api response if it is an error then take action further on it
-                if response.get("success") is False:
-                    return response
-
-                ai_mode = self.check_ai_mode()
-                if not ai_mode:
-                    return response
 
                 # ask AI-Model
                 ai_summary = self.ask_ai(
@@ -170,18 +175,12 @@ class CoreOps:
         """
         try:
             response = request.get("_cat/indices?format=json")
+            
+            if response.get("success") is False:
+                return response
 
             if ai_summarization:
-                # check whether AI Mode is On of Off
-
-                ai_mode = self.check_ai_mode()
-                if not ai_mode:
-                    return response
-
-                 # check api response if it is an error then take action further on it
-                if response.get("success") is False:
-                    return response
-
+        
                 # ask AI-Model
                 ai_summary = self.ask_ai(
                     f"{response.get('response')}\n\nHere is the all available active indices on my elasticsearch node now please start explaining the each index data according to their data in details in simple order to say that please summarize this given data. Start directly from explaining and NO EXTRA ANSWER.")
@@ -216,17 +215,11 @@ class CoreOps:
         """
         try:
             response = request.get("_cat/nodes?format=json")
+            
+            if response.get("success") is False:
+                return response
 
             if ai_summarization:
-                # check whether AI Mode is On of Off
-
-                ai_mode = self.check_ai_mode()
-                if not ai_mode:
-                    return response
-
-                 # check api response if it is an error then take action further on it
-                if response.get("success") is False:
-                    return response
 
                 # ask AI-Model
                 ai_summary = self.ask_ai(
@@ -257,27 +250,21 @@ class CoreOps:
                 "error": str(e)
             }
 
-    def index_info(self, index_name: str, additional_endpoint: str, ai_summarization: bool):
+    def index_info(self, index_name: str, info_type: str, ai_summarization: bool):
         """Retrieve the details of specific index (default response is core details of index) 
         """
         try:
             index = index_name.strip(
                 "/") if index_name.endswith("/") or index_name.startswith("/") else index_name
-            additional_info_type = additional_endpoint.strip("/") if additional_endpoint.endswith(
-                "/") or additional_endpoint.startswith("/") else additional_endpoint
+            additional_info_type = info_type.strip("/") if info_type.endswith(
+                "/") or info_type.startswith("/") else info_type
 
             response = request.get(f"{index}/{additional_info_type}")
+            
+            if response.get("success") is False:
+                return response
 
             if ai_summarization:
-                # check whether AI Mode is On of Off
-
-                ai_mode = self.check_ai_mode()
-                if not ai_mode:
-                    return response
-
-                # check api response if it is an error then take action further on it
-                if response.get("success") is False:
-                    return response
 
                 # ask AI-Model
                 ai_summary = self.ask_ai(
@@ -342,18 +329,12 @@ class CoreOps:
         """
         try:
             response = request.get("_cat/allocation?format=json")
+            
+            if response.get("success") is False:
+                return response
 
             if ai_summarization:
-                # check whether AI Mode is On of Off
-
-                ai_mode = self.check_ai_mode()
-                if not ai_mode:
-                    return response
-
-                # check api response if it is an error then take action further on it
-                if response.get("success") is False:
-                    return response
-
+                
                 # ask AI-Model
                 ai_summary = self.ask_ai(
                     f"{response.get('response')}\n\nHere is the some data of elastic nodes in which having their some information about total storage size allocation and etc. So please summarize the this given data. (start direclty from explaination with NO EXTRA SINGLE LINE UNSUAL ANSWER)")

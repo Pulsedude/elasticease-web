@@ -61,6 +61,36 @@ class CrudOps:
                 "error": str(e)
             }
 
+    def update_doc(self, index_name: str, doc_id: str, new_document: dict):
+        """Update existing document by following proper Optimistic Concurrency Control (OCC)
+        """
+        try:
+            # first fetch document to see their seq_no and primary_no that helps to determine while doing updation whether the document is newly updated or not
+            document = request.get(f"{index_name}/_doc/{doc_id}")
+            
+            if document.get("success") is False:
+                return document 
+            
+            
+            # update document by following proper OCC Rule
+            _seq_no, _primary_term = document.get("response").get("_seq_no"), document.get("response").get("_primary_term")
+            response = request.post(f"{index_name}/_update/{doc_id}?if_seq_no={_seq_no}&if_primary_term={_primary_term}", new_document)
+            
+            if response.get("response").get("error") is not None:
+                return {
+                    "success": False,
+                    "response": response.get("response")
+                }
+            
+            return response
+            
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }
+        
+        
     def index_data_inspect(self, name: str, size: str):
         """Return the index along with their stored data (documents)
         """
@@ -74,3 +104,18 @@ class CrudOps:
                 "success": False,
                 "error": str(e)
             }
+    
+    def inspect_doc(self, index_name: str, doc_id: str):
+        """Inspect document of any such existing index
+        """
+        try:
+            response = request.get(f"{index_name}/_doc/{doc_id}")
+            
+            return response
+            
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }
+            
