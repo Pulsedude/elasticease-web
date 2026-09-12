@@ -48,7 +48,7 @@ class IndexDataInspect(BaseModel):
     index_name: str
     size: str = "100"
 
-class UpdatedDocument(BaseModel):
+class UpdateDocument(BaseModel):
     model_config = ConfigDict(strict=True)
     index_name: str
     document_id: str
