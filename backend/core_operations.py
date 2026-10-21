@@ -1,8 +1,10 @@
 from config import read
 import request
-import urllib3
 import requests
+import urllib3
 import time
+import json
+import asyncio
 
 # AI inferences
 from model_inference import Ollama, LiteLLM
@@ -27,6 +29,54 @@ class CoreOps:
         self.ai_mode = configuration.get("elasticease_web").get(
             "ai_mode") if configuration else configuration
 
+    
+    async def cluster_informational_data(self):
+        """Method to yield cluster informational data after 10 seconds in loop for SSE (Server Sent Events) endpoint. Helpful for Cluster Monitoring & Diagnostics
+        """
+        while True:
+            # cluster health status
+            cluster_health = await asyncio.to_thread(request.get, "_cluster/health")
+            if cluster_health.get("success") is False:
+                cluster_health = await asyncio.to_thread(request.get)
+             
+            # total nodes actve
+            total_nodes = await asyncio.to_thread(request.get, "_cat/nodes?format=json")
+            
+            # total indices and total documents
+            indices = await asyncio.to_thread(request.get, "_cat/indices?format=json")
+            
+            if cluster_health.get("success") is False or total_nodes.get("success") is False or indices.get("success") is False:
+                error_payload = {
+                    "error": True,
+                    "cluster_health": cluster_health,
+                    "total_nodes": total_nodes,
+                    "indices": indices
+                }
+                yield f"data: {json.dumps(error_payload)}\n\n"
+                await asyncio.sleep(10)
+                continue
+                
+            total_docs = 0
+            indices_list = indices.get("response")
+            for index in indices_list:
+                if isinstance(index.get("docs.count"), str):
+                    try:
+                        total_docs += int(index.get("docs.count"))
+                    except (ValueError, TypeError):
+                        pass
+            
+            data = {
+                "cluster_health": cluster_health.get("response"),
+                "total_nodes": total_nodes.get("response"),
+                "indices": indices_list,
+                "total_docs": total_docs 
+            }
+            
+            yield f"data: {json.dumps(data)}\n\n"
+            
+            await asyncio.sleep(10)
+            
+    
     def ask_ai(self, prompt: str):
         """Ask model on specific query according to selected AI-Inference (Provider)
         """
@@ -99,17 +149,54 @@ class CoreOps:
         """Check authorization By making request to base url of elasticsearch
         """
         try:
+            cfg = read()
+            
+            if isinstance(cfg, tuple):
+                return {
+                    "success": False,
+                    "error": cfg[1]
+                }
+            
+            elastic_base_url = cfg.get("elasticease_web").get("elasticsearch").get("base_url")
+            verify_certs = cfg.get("elasticease_web").get("elasticsearch").get("verify_certs")
+            
+            if elastic_base_url is None or verify_certs is None:
+                return {
+                    "success": False,
+                    "error": "please check the elasticsearch configurations and try again!"
+                }
+                
             response = requests.get(
-                self.elastic_base_url,
-                timeout=10,
+                url=elastic_base_url.strip(),
+                timeout=20,
                 auth=(username, password),
-                verify=self.verify_certs
+                verify=verify_certs
             )
-
+            
             if response.status_code == 401:
-                return {"success": False, "status": "alive", "response": "failed to authorize"}
+                return {
+                    "success": False,
+                    "status_code": 401,
+                    "error": response.json()
+                }
 
-            return {"success": True, "status": "alive", "response": response.json()}
+            if not response.ok:
+                try:
+                    err_payload = response.json()
+                except Exception:
+                    err_payload = response.text
+                return {
+                    "success": False,
+                    "status_code": response.status_code,
+                    "error": err_payload
+                }
+
+            return {
+                "success": True,
+                "status_code": 200,
+                "response": response.json()
+            }
+        
         except Exception as e:
             return {
                 "success": False,

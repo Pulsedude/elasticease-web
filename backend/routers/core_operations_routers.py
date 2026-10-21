@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, status
+from fastapi.responses import StreamingResponse
 from core_operations import CoreOps
 from .models import (
     LoginCredentials,
@@ -12,8 +13,17 @@ import config
 router = APIRouter(prefix="/v1/core")
 coreops = CoreOps()
 
+# SSE (Server Sent Events) Endpoint to fetch some informational cluster data about elastic cluster health, total nodes, indices etc.
+@router.get("/cluster_info", description="SSE (Server Sent Event) endpoint to return some informational data about elastic cluster")
+async def cluster_info():
+    return StreamingResponse(
+        coreops.cluster_informational_data(),
+        media_type="text/event-stream"
+    )
 
-@router.get("/latency", status_code=status.HTTP_200_OK)
+# Other traditional REST Endpoints ------------------------
+
+@router.get("/latency", status_code=status.HTTP_200_OK, description="Measure and return round-trip network response latency (in milliseconds) to the Elasticsearch API")
 def see_latency_of_api():
     """Return the latency of Elasticsearch API
     """
@@ -42,7 +52,7 @@ def see_latency_of_api():
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": str(e)})
 
 
-@router.post("/auth", status_code=status.HTTP_200_OK)
+@router.post("/auth", status_code=status.HTTP_200_OK, description="Authenticate user login credentials against configuration and verify connectivity to the Elasticsearch cluster")
 def authorization(credentials: LoginCredentials):
     """
     Validate user credentials against config.yaml, then check Elasticsearch connection
@@ -76,7 +86,7 @@ def authorization(credentials: LoginCredentials):
         )
 
 
-@router.get("/cluster_status", status_code=status.HTTP_200_OK)
+@router.get("/cluster_status", status_code=status.HTTP_200_OK, description="Retrieve overall cluster health status, shard allocations, active nodes, and cluster metrics from Elasticsearch")
 def to_check_the_active_cluster_status():
     """Return the health & details of active cluster
     """
@@ -102,7 +112,7 @@ def to_check_the_active_cluster_status():
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": str(e)})
 
 
-@router.get("/shards", status_code=status.HTTP_200_OK)
+@router.get("/shards", status_code=status.HTTP_200_OK, description="Retrieve all active, unassigned, and relocating shards across nodes with optional AI-powered summarization")
 def see_total_number_of_available_shards(ai_summarization: bool = False):
     """Return to total number of active shards on target node with detailed information
     """
@@ -131,7 +141,7 @@ def see_total_number_of_available_shards(ai_summarization: bool = False):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": str(e)})
 
 
-@router.get("/nodes", status_code=status.HTTP_200_OK)
+@router.get("/nodes", status_code=status.HTTP_200_OK, description="Retrieve connected Elasticsearch nodes with CPU, RAM, heap percent, roles, and load metrics with optional AI-powered summarization")
 def see_total_number_active_nodes(ai_summarization: bool = False):
     """Return to total number of active nodes running on cluster
     """
@@ -158,7 +168,7 @@ def see_total_number_active_nodes(ai_summarization: bool = False):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": str(e)})
 
 
-@router.get("/indices", status_code=status.HTTP_200_OK)
+@router.get("/indices", status_code=status.HTTP_200_OK, description="Retrieve index metadata, health states, doc counts, store sizes, and shard counts with optional AI-powered summarization")
 def see_all_indices(ai_summarization: bool = False):
     """Return the total number indices on active nodes
     """
@@ -185,7 +195,7 @@ def see_all_indices(ai_summarization: bool = False):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": str(e)})
 
 
-@router.get("/ai_config", status_code=status.HTTP_200_OK)
+@router.get("/ai_config", status_code=status.HTTP_200_OK, description="Retrieve the current AI inference settings, selected provider (Ollama or LiteLLM), model details, and AI toggle mode")
 def get_ai_configuration():
     """Return current selected AI inference provider and config from config.yaml"""
     try:
@@ -211,7 +221,7 @@ def get_ai_configuration():
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": str(e)})
 
 
-@router.put("/ai_inference", status_code=status.HTTP_200_OK)
+@router.put("/ai_inference", status_code=status.HTTP_200_OK, description="Update the active AI inference provider (Ollama or LiteLLM) and toggle AI mode in config.yaml and the active session")
 def update_ai_inference(body: AIInferenceUpdate):
     """Update selected AI inference provider in config.yaml and active session"""
     try:
@@ -258,7 +268,7 @@ def update_ai_inference(body: AIInferenceUpdate):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": str(e)})
 
 
-@router.put("/update_elastic_url", status_code=status.HTTP_200_OK)
+@router.put("/update_elastic_url", status_code=status.HTTP_200_OK, description="Update the Elasticsearch base URL endpoint in config.yaml and synchronize the backend client connection")
 def update_elastic_base_url(body: URLUpdate):
     """Update existing Elasticsearch request URL with new Base URL
     """
@@ -299,7 +309,7 @@ def update_elastic_base_url(body: URLUpdate):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": str(e)})
 
 
-@router.put("/update_backend_url", status_code=status.HTTP_200_OK)
+@router.put("/update_backend_url", status_code=status.HTTP_200_OK, description="Update the backend API base URL in config.yaml for client requests and configuration synchronization")
 def update_backend_base_url(body: URLUpdate):
     """Update existing backend API base url with new base URL
     """
@@ -340,7 +350,7 @@ def update_backend_base_url(body: URLUpdate):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": str(e)})
 
 
-@router.post("/ai_summarization", status_code=status.HTTP_200_OK)
+@router.post("/ai_summarization", status_code=status.HTTP_200_OK, description="Submit an analytical prompt or cluster dataset to the configured AI engine for intelligent summarization and insights")
 def ask_ai_to_summarize_data(body: PromptForAI):
     """Special endpoint used to send data summarization request to Model
     """
@@ -365,7 +375,7 @@ def ask_ai_to_summarize_data(body: PromptForAI):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": str(e)})
 
 
-@router.post("/index_inspect", status_code=status.HTTP_200_OK)
+@router.post("/index_inspect", status_code=status.HTTP_200_OK, description="Inspect detailed metadata, settings, mappings, statistics, or aliases for a specific index with optional AI summarization")
 def see_specific_index_details(body: IndexDetails):
     """Retrieve the details of specific index (default response is core details of index)
     """
@@ -393,7 +403,7 @@ def see_specific_index_details(body: IndexDetails):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": str(e)})
 
 
-@router.get("/master_node", status_code=status.HTTP_200_OK)
+@router.get("/master_node", status_code=status.HTTP_200_OK, description="Retrieve identity, IP address, and role information for the elected master node in the Elasticsearch cluster")
 def master_node_info():
     """Retrieve the master node information 
     """
@@ -420,7 +430,7 @@ def master_node_info():
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": str(e)})
 
 
-@router.post("/allocation", status_code=status.HTTP_200_OK)
+@router.post("/allocation", status_code=status.HTTP_200_OK, description="Retrieve disk space utilization, remaining disk capacity, and shard allocation across cluster nodes with optional AI summarization")
 def nodes_disk_allocation(ai_summarization: bool = False):
     """Retrieve the active nodes disk allocation data
     """

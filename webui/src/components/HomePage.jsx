@@ -34,6 +34,21 @@ function formatDocsCount(num) {
   return num.toLocaleString();
 }
 
+function deriveClusterStatus(clusterHealth, indices) {
+  if (clusterHealth?.status) {
+    return clusterHealth.status.toLowerCase();
+  }
+  if (Array.isArray(indices) && indices.length > 0) {
+    if (indices.some((idx) => (idx.health || "").toLowerCase() === "red")) return "red";
+    if (indices.some((idx) => (idx.health || "").toLowerCase() === "yellow")) return "yellow";
+    return "green";
+  }
+  if (clusterHealth?.cluster_name || clusterHealth?.tagline || clusterHealth?.name) {
+    return "green";
+  }
+  return null;
+}
+
 function getHealthConfig(statusStr, isDark) {
   const s = (statusStr || "").toLowerCase();
   if (s === "green") {
@@ -84,44 +99,58 @@ export default function HomePage({ onNavigateToTab, theme }) {
   const isDark = theme === "dark";
 
   const [isLoading, setIsLoading] = useState(true);
-  const [clusterData, setClusterData] = useState(null);
+  const [clusterInfo, setClusterInfo] = useState(null);
   const [latencyData, setLatencyData] = useState(null);
   const [latencyHistory, setLatencyHistory] = useState([1.2, 1.3, 1.1, 1.8, 1.2, 1.2]);
-  const [docsData, setDocsData] = useState({ totalDocs: null, indicesCount: 0 });
-  const topologyNodes = [
-    { name: "node-primary-01", ip: "10.0.0.12", cpu: "42%", master: true },
-    { name: "node-data-02",    ip: "10.0.0.13", cpu: "38%", master: false },
-    { name: "node-data-03",    ip: "10.0.0.14", cpu: "45%", master: false },
-  ];
 
-  // ── Fetch live telemetry from backend ──────────────────────────────────
+  // ── 1. SSE Stream: Real-time Cluster Info from /v1/core/cluster_info ──
+  useEffect(() => {
+    let isMounted = true;
+    let eventSource = null;
+
+    try {
+      eventSource = new EventSource(`${API_BASE_URL}/v1/core/cluster_info`);
+
+      eventSource.onmessage = (event) => {
+        if (!isMounted) return;
+        try {
+          const payload = JSON.parse(event.data);
+          if (payload) {
+            setClusterInfo(payload);
+            setIsLoading(false);
+          }
+        } catch (err) {
+          console.error("[HomePage] SSE JSON parse error:", err);
+        }
+      };
+
+      eventSource.onerror = (err) => {
+        console.warn("[HomePage] SSE connection issue, EventSource will automatically retry:", err);
+      };
+    } catch (err) {
+      console.error("[HomePage] Failed to initialize SSE EventSource:", err);
+    }
+
+    return () => {
+      isMounted = false;
+      if (eventSource) {
+        eventSource.close();
+      }
+    };
+  }, []);
+
+  // ── 2. Query Latency: /v1/core/latency Endpoint ───────────────────────
   useEffect(() => {
     let isMounted = true;
 
-    async function fetchTelemetry() {
+    async function fetchLatency() {
       try {
-        const [clusterRes, latencyRes, nodesRes, indicesRes] = await Promise.allSettled([
-          fetch(`${API_BASE_URL}/v1/core/cluster_status`),
-          fetch(`${API_BASE_URL}/v1/core/latency`),
-          fetch(`${API_BASE_URL}/v1/core/nodes`),
-          fetch(`${API_BASE_URL}/v1/core/indices`),
-        ]);
-
+        const res = await fetch(`${API_BASE_URL}/v1/core/latency`);
         if (!isMounted) return;
-
-        // 1. Cluster Health  → { success, response: { status, number_of_nodes, number_of_data_nodes, active_shards, ... } }
-        if (clusterRes.status === "fulfilled" && clusterRes.value.ok) {
-          const j = await clusterRes.value.json();
-          if (j?.success && j?.response) {
-            setClusterData(j.response);
-          }
-        }
-
-        // 2. API Latency  → { success, response: <float ms> }
-        if (latencyRes.status === "fulfilled" && latencyRes.value.ok) {
-          const j = await latencyRes.value.json();
+        if (res.ok) {
+          const j = await res.json();
           if (j?.success && typeof j?.response === "number") {
-            const ms = Math.round(j.response * 10) / 10;   // 1 decimal place
+            const ms = Math.round(j.response * 10) / 10;
             setLatencyData(ms);
             setLatencyHistory((prev) => {
               const next = [...prev, ms];
@@ -129,53 +158,66 @@ export default function HomePage({ onNavigateToTab, theme }) {
             });
           }
         }
-
-        // 3. Nodes  → { success, response: [ { name, ip, heap.percent, cpu, load_1m, ... } ] }
-        // (Cluster topology displays configured primary and data nodes)
-
-        // 4. Indices  → { success, response: [ { index, "docs.count", "store.size", ... } ] }
-        if (indicesRes.status === "fulfilled" && indicesRes.value.ok) {
-          const j = await indicesRes.value.json();
-          if (j?.success && Array.isArray(j?.response)) {
-            const indices = j.response;
-            // sum docs.count across all indices (filter out system indices starting with .)
-            const totalDocs = indices.reduce((acc, idx) => {
-              const raw = idx["docs.count"] ?? idx["docs"] ?? "0";
-              return acc + (parseInt(String(raw), 10) || 0);
-            }, 0);
-            const visibleIndices = indices.filter((idx) => !String(idx.index || "").startsWith("."));
-            setDocsData({
-              totalDocs,
-              indicesCount: visibleIndices.length || indices.length,
-            });
-          }
-        }
-
-        if (isMounted) setIsLoading(false);
       } catch (err) {
-        console.error("[HomePage] Telemetry fetch error:", err);
-        if (isMounted) setIsLoading(false);
+        console.error("[HomePage] Latency fetch error:", err);
       }
     }
 
-    fetchTelemetry();
-    const interval = setInterval(fetchTelemetry, 10_000);
+    fetchLatency();
+    const interval = setInterval(fetchLatency, 10_000);
+
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [API_BASE_URL]);
+  }, []);
 
+  // ── Derived Data from SSE payload ─────────────────────────────────────
+  const clusterHealth = clusterInfo?.cluster_health;
+  const nodes = Array.isArray(clusterInfo?.total_nodes) ? clusterInfo.total_nodes : [];
+  const indices = Array.isArray(clusterInfo?.indices) ? clusterInfo.indices : [];
+  const totalDocs = clusterInfo?.total_docs !== undefined && clusterInfo?.total_docs !== null
+    ? clusterInfo.total_docs
+    : (indices.length > 0
+        ? indices.reduce((acc, idx) => acc + (parseInt(String(idx["docs.count"] || "0"), 10) || 0), 0)
+        : null);
 
-  const healthCfg = getHealthConfig(clusterData?.status, isDark);
+  const visibleIndices = indices.filter((idx) => !String(idx.index || "").startsWith("."));
+  const indicesCount = visibleIndices.length || indices.length;
+
+  const derivedStatus = deriveClusterStatus(clusterHealth, indices);
+  const healthCfg = getHealthConfig(derivedStatus, isDark);
+
+  const activeNodesCount = nodes.length;
+  const dataNodesCount = nodes.filter((n) => String(n["node.role"] || "").includes("d")).length;
+
+  const activePrimaryShards = clusterHealth?.active_shards !== undefined
+    ? clusterHealth.active_shards
+    : indices.reduce((acc, idx) => acc + (parseInt(idx.pri || "0", 10) || 0), 0);
+  const totalShards = clusterHealth?.active_shards !== undefined && clusterHealth?.unassigned_shards !== undefined
+    ? clusterHealth.active_shards + clusterHealth.unassigned_shards
+    : indices.reduce((acc, idx) => acc + ((parseInt(idx.pri || "0", 10) || 0) + (parseInt(idx.rep || "0", 10) || 0)), 0);
+
+  const displayTopology = nodes.length > 0
+    ? nodes.map((n) => ({
+        name: n.name || "unknown",
+        ip: n.ip || "-",
+        cpu: n.cpu ? `${n.cpu}%` : "-",
+        master: n.master === "*" || String(n["node.role"] || "").includes("m"),
+      }))
+    : [
+        { name: "node-primary-01", ip: "10.0.0.12", cpu: "42%", master: true },
+        { name: "node-data-02",    ip: "10.0.0.13", cpu: "38%", master: false },
+        { name: "node-data-03",    ip: "10.0.0.14", cpu: "45%", master: false },
+      ];
 
   const stats = [
     {
       label: "Cluster Health",
-      value: clusterData?.status
-        ? clusterData.status.charAt(0).toUpperCase() + clusterData.status.slice(1)
+      value: derivedStatus
+        ? derivedStatus.charAt(0).toUpperCase() + derivedStatus.slice(1)
         : (isLoading ? "Loading..." : "Green"),
-      sub: clusterData?.status ? healthCfg.sub : "All nodes responsive",
+      sub: derivedStatus ? healthCfg.sub : "All nodes responsive",
       icon: ShieldIcon,
       color: healthCfg.color,
       bg: healthCfg.bg,
@@ -186,24 +228,26 @@ export default function HomePage({ onNavigateToTab, theme }) {
     },
     {
       label: "Active Nodes",
-      value: clusterData?.number_of_nodes !== undefined
-        ? `${clusterData.number_of_nodes} / ${clusterData.number_of_nodes}`
-        : (isLoading ? "Loading..." : "3 / 3"),
-      sub: clusterData?.number_of_data_nodes !== undefined
-        ? `${clusterData.number_of_data_nodes} data node${clusterData.number_of_data_nodes === 1 ? "" : "s"}`
-        : "CPU avg 42%",
+      value: activeNodesCount > 0
+        ? `${activeNodesCount} Active`
+        : (isLoading ? "Loading..." : "0 Active"),
+      sub: activeNodesCount > 0
+        ? (dataNodesCount > 0
+            ? `${dataNodesCount} data node${dataNodesCount === 1 ? "" : "s"}`
+            : `${activeNodesCount} total node${activeNodesCount === 1 ? "" : "s"}`)
+        : "No nodes responding",
       icon: ServerIcon,
       color: "text-indigo-400",
       bg: isDark ? "bg-indigo-500/10" : "bg-indigo-50",
       border: isDark ? "border-indigo-500/20" : "border-indigo-200",
       sparkline: [35, 45, 42, 50, 48, 42],
       sparkColor: "#818cf8",
-      dot: "bg-indigo-500",
+      dot: activeNodesCount > 0 ? "bg-indigo-500" : "bg-slate-500",
     },
     {
       label: "Query Latency",
       value: latencyData !== null ? `${latencyData}ms` : (isLoading ? "Loading..." : "1.2ms"),
-      sub: latencyData !== null ? "Elasticsearch API ping" : "p99: 4.5ms",
+      sub: latencyData !== null ? "Elasticsearch API ping" : "Elasticsearch API ping",
       icon: ActivityIcon,
       color: "text-purple-400",
       bg: isDark ? "bg-purple-500/10" : "bg-purple-50",
@@ -214,8 +258,8 @@ export default function HomePage({ onNavigateToTab, theme }) {
     },
     {
       label: "Total Docs",
-      value: docsData.totalDocs !== null ? formatDocsCount(docsData.totalDocs) : (isLoading ? "Loading..." : "6.3M"),
-      sub: docsData.indicesCount > 0 ? `${docsData.indicesCount} ${docsData.indicesCount === 1 ? "index" : "indices"}` : "24 indices",
+      value: totalDocs !== null ? formatDocsCount(totalDocs) : (isLoading ? "Loading..." : "0"),
+      sub: indicesCount > 0 ? `${indicesCount} ${indicesCount === 1 ? "index" : "indices"}` : "0 indices",
       icon: DatabaseIcon,
       color: "text-blue-400",
       bg: isDark ? "bg-blue-500/10" : "bg-blue-50",
@@ -232,8 +276,6 @@ export default function HomePage({ onNavigateToTab, theme }) {
     { title: "Index Orchestration",            desc: "Create, reindex, alias, and update mapping schemas with built-in validation.",     icon: LayersIcon   },
     { title: "Python Backend Integration",     desc: "Fully wired to your run.py backend — async requests, API proxying, secure auth.", icon: CpuIcon      },
   ];
-
-  const surf = isDark ? "bg-[#0c0c10] border-[#1e2130]" : "bg-white border-slate-200 shadow-sm";
 
   return (
     <div className="page-stack">
@@ -253,9 +295,9 @@ export default function HomePage({ onNavigateToTab, theme }) {
             }`}>
               <span className={`w-2 h-2 rounded-full inline-block animate-pulse flex-shrink-0 ${healthCfg.dot}`} />
               <span className="flex items-center gap-1.5 leading-none">
-                <span>{clusterData?.cluster_name || "elasticease-production"}</span>
+                <span>{clusterHealth?.cluster_name || "elasticsearch"}</span>
                 <span className="opacity-50">&middot;</span>
-                <span>connected</span>
+                <span>{derivedStatus ? "connected" : "connecting..."}</span>
               </span>
             </div>
 
@@ -309,11 +351,11 @@ export default function HomePage({ onNavigateToTab, theme }) {
                   <span className={`ml-1.5 text-xs font-mono font-medium leading-none ${isDark ? "text-slate-400" : "text-slate-500"}`}>cluster-topology</span>
                 </div>
                 <span className={`inline-flex items-center h-5 px-2 rounded text-[11px] font-mono font-medium border leading-none ${isDark ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-emerald-50 text-emerald-700 border-emerald-200"}`}>
-                  3 nodes active
+                  {nodes.length > 0 ? `${nodes.length} node${nodes.length === 1 ? "" : "s"} active` : "3 nodes active"}
                 </span>
               </div>
               <div className="p-3 flex flex-col gap-2">
-                {topologyNodes.map((n) => (
+                {displayTopology.map((n) => (
                   <div key={n.name} className={`flex items-center justify-between h-[54px] px-3 rounded-lg border transition-colors ${
                     isDark ? "bg-[#0c0c10]/60 border-[#1e2130] hover:bg-[#1e2130]/50" : "bg-white border-slate-200 hover:bg-slate-100/80"
                   }`}>
@@ -353,7 +395,7 @@ export default function HomePage({ onNavigateToTab, theme }) {
                 }`}>
                   <span className={`leading-none ${isDark ? "text-slate-400" : "text-slate-500"}`}>active_shards</span>
                   <span className="font-mono text-emerald-500 font-semibold leading-none">
-                    {clusterData?.active_shards !== undefined ? `${clusterData.active_shards} / ${clusterData.active_shards}` : "60 / 60"}
+                    {indices.length > 0 ? `${activePrimaryShards} / ${totalShards || activePrimaryShards}` : "60 / 60"}
                   </span>
                 </div>
               </div>
@@ -451,4 +493,3 @@ export default function HomePage({ onNavigateToTab, theme }) {
     </div>
   );
 }
-
