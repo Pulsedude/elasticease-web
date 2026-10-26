@@ -1,26 +1,24 @@
-import request
 import urllib3
-import config
+from request import Client
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-
 class CrudOps:
     def __init__(self):
-        configuration = config.read()
+        self.client = Client()
 
     def create_index(self, name: str, with_mapping: bool, mapping: dict):
         """Create new index with or without proper specifying mapping
         """
         try:
             if not with_mapping:
-                response = request.put(name, mapping)
+                response = self.client.put(name, mapping)
 
                 return response
 
             mapping = mapping
 
-            response = request.put(
+            response = self.client.put(
                 name,
                 mapping
             )
@@ -37,7 +35,7 @@ class CrudOps:
         """Delete any such existing index
         """
         try:
-            response = request.delete(name)
+            response = self.client.delete(name)
 
             return response
 
@@ -51,7 +49,7 @@ class CrudOps:
         """Insert new document into existing index
         """
         try:
-            response = request.post(f"{index}/_doc/{id}", document)
+            response = self.client.post(f"/{index}/_doc/{id}", document)
 
             return response
 
@@ -66,7 +64,7 @@ class CrudOps:
         """
         try:
             # first fetch document to see their seq_no and primary_no that helps to determine while doing updation whether the document is newly updated or not
-            document = request.get(f"{index_name}/_doc/{doc_id}")
+            document = self.client.get(f"/{index_name}/_doc/{doc_id}")
             
             if document.get("success") is False:
                 return document 
@@ -74,7 +72,7 @@ class CrudOps:
             
             # update document by following proper OCC Rule
             _seq_no, _primary_term = document.get("response").get("_seq_no"), document.get("response").get("_primary_term")
-            response = request.post(f"{index_name}/_update/{doc_id}?if_seq_no={_seq_no}&if_primary_term={_primary_term}", new_document)
+            response = self.client.post(f"{index_name}/_update/{doc_id}?if_seq_no={_seq_no}&if_primary_term={_primary_term}", new_document)
             
             if response.get("response").get("error") is not None:
                 return {
@@ -95,7 +93,7 @@ class CrudOps:
         """Return the index along with their stored data (documents)
         """
         try:
-            response = request.get(f"{name}/_search/?size={size}")
+            response = self.client.get(f"/{name}/_search/?size={size}")
 
             return response
                 
@@ -109,10 +107,61 @@ class CrudOps:
         """Inspect document of any such existing index
         """
         try:
-            response = request.get(f"{index_name}/_doc/{doc_id}")
+            response = self.client.get(f"/{index_name}/_doc/{doc_id}")
             
             return response
             
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }
+    
+    def bulk_insertion(self, index_name: str, docs: list[dict]):
+        """Update multiple documents at once (bulk insert)
+        """
+        try:
+            # bulk insertion of existing documents
+            response_1 = self.client.bulk_insert(index_name, docs)
+            
+            return response_1
+        
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }
+            
+            
+    def bulk_updatation(self, index_name: str, docs: list[dict]):
+        """Update multiple documents at once (bulk update)
+        """
+        try:
+            # first of all check for existing index
+            response_1 = self.client.get(f"/{index_name}")
+            if response_1.get("success") is False:
+                return response_1
+            
+            # bulk updation of existing documents
+            response_2 = self.client.bulk_update(index_name, docs)
+            
+            return response_2
+        
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }
+            
+    def bulk_deletion(self, index_name: str, docs: list[dict]):
+        """Delete multiple documents at once (bulk update)
+        """
+        try:
+            # bulk deletion of existing documents
+            response_1 = self.client.bulk_delete(index_name, docs)
+            
+            return response_1
+        
         except Exception as e:
             return {
                 "success": False,
