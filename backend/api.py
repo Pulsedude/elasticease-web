@@ -44,12 +44,10 @@ async def logging_middleware(request: Request, call_next):
         
         logger.info(f"path: {request.url.path}, method: {request.method}, status: {response.status_code}, time: {total_time:.3f} ms, cpu usage: {cpu_usage} %")
         
-        # latency
-        response.headers["X-API-Latency"] = f"{end - start:.3f}"
         return response
         
     except Exception as e:
-        logger.error(f"path: {request.url.path}, method: {request.method}, status: {response.status_code}, time: {total_time:.3f} ms, cpu usage: {cpu_usage} %")
+        logger.error(f"path: {request.url.path}, method: {request.method}, error: {e}")
 
 
 # CORS middleware to allow frontend communication

@@ -203,6 +203,41 @@ def see_total_number_active_nodes(ai_summarization: bool = False):
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": str(e)})
+        
+        
+@router.get("/inspect_node", status_code=status.HTTP_200_OK, description="Retrieve information of connected & active Elasticsearch node")
+def inspect_active_node(id_or_name: str, info_type: str, ai_summarization: bool = False):
+    """Return the information of connected & active elasticsearch node 
+    """
+    try:
+        response = coreops.inspect_node(id_or_name, info_type, ai_summarization)
+
+        if "error" in response:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"error": response.get("error")},
+            )
+
+        elif response.get("response") == "failed to authorize":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={"error": response.get("response")},
+            )
+
+        elif response.get("success") is False:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"error": response.get("response")},
+            )
+
+        return response
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": str(e)})
 
 
 @router.get("/indices", status_code=status.HTTP_200_OK, description="Retrieve index metadata, health states, doc counts, store sizes, and shard counts with optional AI-powered summarization")
