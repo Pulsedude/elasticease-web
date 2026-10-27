@@ -34,16 +34,32 @@ function formatDocsCount(num) {
   return num.toLocaleString();
 }
 
-function deriveClusterStatus(clusterHealth, indices) {
+function formatBytes(bytes) {
+  if (bytes === null || bytes === undefined || isNaN(bytes)) return "--";
+  if (bytes === 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB", "PB"];
+  let i = 0;
+  let val = Number(bytes);
+  while (val >= 1024 && i < units.length - 1) {
+    val /= 1024;
+    i++;
+  }
+  return `${val.toFixed(1)} ${units[i]}`;
+}
+
+function deriveClusterStatus(statsData, clusterHealth, indices) {
+  if (statsData?.status) {
+    return String(statsData.status).toLowerCase();
+  }
   if (clusterHealth?.status) {
-    return clusterHealth.status.toLowerCase();
+    return String(clusterHealth.status).toLowerCase();
   }
   if (Array.isArray(indices) && indices.length > 0) {
     if (indices.some((idx) => (idx.health || "").toLowerCase() === "red")) return "red";
     if (indices.some((idx) => (idx.health || "").toLowerCase() === "yellow")) return "yellow";
     return "green";
   }
-  if (clusterHealth?.cluster_name || clusterHealth?.tagline || clusterHealth?.name) {
+  if (statsData?.cluster_name || clusterHealth?.cluster_name || clusterHealth?.tagline || clusterHealth?.name) {
     return "green";
   }
   return null;
@@ -99,11 +115,13 @@ export default function HomePage({ onNavigateToTab, theme }) {
   const isDark = theme === "dark";
 
   const [isLoading, setIsLoading] = useState(true);
+  const [isBackendOffline, setIsBackendOffline] = useState(false);
   const [clusterInfo, setClusterInfo] = useState(null);
   const [latencyData, setLatencyData] = useState(null);
   const [latencyHistory, setLatencyHistory] = useState([1.2, 1.3, 1.1, 1.8, 1.2, 1.2]);
+  const [fetchedNodes, setFetchedNodes] = useState([]);
 
-  // ── 1. SSE Stream: Real-time Cluster Info from /v1/core/cluster_info ──
+  // ── 1. SSE Stream: Real-time Cluster Info & Latency from /v1/core/cluster_info ──
   useEffect(() => {
     let isMounted = true;
     let eventSource = null;
@@ -116,8 +134,27 @@ export default function HomePage({ onNavigateToTab, theme }) {
         try {
           const payload = JSON.parse(event.data);
           if (payload) {
+            if (payload.success === false) {
+              setIsBackendOffline(true);
+              setIsLoading(false);
+              return;
+            }
             setClusterInfo(payload);
             setIsLoading(false);
+            setIsBackendOffline(false);
+
+            // Extract latency from the same /cluster_info route
+            if (payload.latency !== undefined && payload.latency !== null) {
+              const rawLat = parseFloat(payload.latency);
+              if (!isNaN(rawLat)) {
+                const ms = Math.round(rawLat * 10) / 10;
+                setLatencyData(ms);
+                setLatencyHistory((prev) => {
+                  const next = [...prev, ms];
+                  return next.length > 10 ? next.slice(next.length - 10) : next;
+                });
+              }
+            }
           }
         } catch (err) {
           console.error("[HomePage] SSE JSON parse error:", err);
@@ -126,9 +163,17 @@ export default function HomePage({ onNavigateToTab, theme }) {
 
       eventSource.onerror = (err) => {
         console.warn("[HomePage] SSE connection issue, EventSource will automatically retry:", err);
+        if (isMounted) {
+          setIsBackendOffline(true);
+          setIsLoading(false);
+        }
       };
     } catch (err) {
       console.error("[HomePage] Failed to initialize SSE EventSource:", err);
+      if (isMounted) {
+        setIsBackendOffline(true);
+        setIsLoading(false);
+      }
     }
 
     return () => {
@@ -139,64 +184,75 @@ export default function HomePage({ onNavigateToTab, theme }) {
     };
   }, []);
 
-  // ── 2. Query Latency: /v1/core/latency Endpoint ───────────────────────
+  // Fetch node details for topology visualization if available
   useEffect(() => {
     let isMounted = true;
-
-    async function fetchLatency() {
+    async function loadNodes() {
       try {
-        const res = await fetch(`${API_BASE_URL}/v1/core/latency`);
+        const res = await fetch(`${API_BASE_URL}/v1/core/nodes`);
         if (!isMounted) return;
         if (res.ok) {
           const j = await res.json();
-          if (j?.success && typeof j?.response === "number") {
-            const ms = Math.round(j.response * 10) / 10;
-            setLatencyData(ms);
-            setLatencyHistory((prev) => {
-              const next = [...prev, ms];
-              return next.length > 10 ? next.slice(next.length - 10) : next;
-            });
-          }
+          const list = j?.response || (Array.isArray(j) ? j : []);
+          if (Array.isArray(list)) setFetchedNodes(list);
         }
-      } catch (err) {
-        console.error("[HomePage] Latency fetch error:", err);
+      } catch {
+        /* silent */
       }
     }
-
-    fetchLatency();
-    const interval = setInterval(fetchLatency, 10_000);
-
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
+    loadNodes();
+    return () => { isMounted = false; };
   }, []);
 
-  // ── Derived Data from SSE payload ─────────────────────────────────────
+  // ── Derived Data from SSE payload (from /_cluster/stats via /cluster_info) ──
+  const statsData = (clusterInfo?.response && typeof clusterInfo.response === "object")
+    ? clusterInfo.response
+    : clusterInfo;
+
   const clusterHealth = clusterInfo?.cluster_health;
-  const nodes = Array.isArray(clusterInfo?.total_nodes) ? clusterInfo.total_nodes : [];
+  const nodes = Array.isArray(clusterInfo?.total_nodes) && clusterInfo.total_nodes.length > 0
+    ? clusterInfo.total_nodes
+    : (Array.isArray(fetchedNodes) ? fetchedNodes : []);
   const indices = Array.isArray(clusterInfo?.indices) ? clusterInfo.indices : [];
-  const totalDocs = clusterInfo?.total_docs !== undefined && clusterInfo?.total_docs !== null
-    ? clusterInfo.total_docs
-    : (indices.length > 0
-        ? indices.reduce((acc, idx) => acc + (parseInt(String(idx["docs.count"] || "0"), 10) || 0), 0)
-        : null);
 
-  const visibleIndices = indices.filter((idx) => !String(idx.index || "").startsWith("."));
-  const indicesCount = visibleIndices.length || indices.length;
-
-  const derivedStatus = deriveClusterStatus(clusterHealth, indices);
+  const derivedStatus = deriveClusterStatus(statsData, clusterHealth, indices);
   const healthCfg = getHealthConfig(derivedStatus, isDark);
 
-  const activeNodesCount = nodes.length;
-  const dataNodesCount = nodes.filter((n) => String(n["node.role"] || "").includes("d")).length;
+  const clusterName = statsData?.cluster_name || clusterHealth?.cluster_name || "elasticsearch";
 
-  const activePrimaryShards = clusterHealth?.active_shards !== undefined
-    ? clusterHealth.active_shards
-    : indices.reduce((acc, idx) => acc + (parseInt(idx.pri || "0", 10) || 0), 0);
-  const totalShards = clusterHealth?.active_shards !== undefined && clusterHealth?.unassigned_shards !== undefined
-    ? clusterHealth.active_shards + clusterHealth.unassigned_shards
-    : indices.reduce((acc, idx) => acc + ((parseInt(idx.pri || "0", 10) || 0) + (parseInt(idx.rep || "0", 10) || 0)), 0);
+  // Nodes counts
+  const totalNodesCount = statsData?.nodes?.count?.total
+    ?? (Array.isArray(nodes) ? nodes.length : 0);
+  const dataNodesCount = statsData?.nodes?.count?.data
+    ?? (Array.isArray(nodes) ? nodes.filter((n) => String(n["node.role"] || "").includes("d")).length : 0);
+  const masterNodesCount = statsData?.nodes?.count?.master
+    ?? (Array.isArray(nodes) ? nodes.filter((n) => n.master === "*" || String(n["node.role"] || "").includes("m")).length : 0);
+  const ingestNodesCount = statsData?.nodes?.count?.ingest ?? 0;
+  const esVersions = Array.isArray(statsData?.nodes?.versions) ? statsData.nodes.versions.join(", ") : null;
+
+  // Documents & Indices count
+  const totalDocs = statsData?.indices?.docs?.count
+    ?? (clusterInfo?.total_docs !== undefined && clusterInfo?.total_docs !== null
+        ? clusterInfo.total_docs
+        : (indices.length > 0
+            ? indices.reduce((acc, idx) => acc + (parseInt(String(idx["docs.count"] || "0"), 10) || 0), 0)
+            : null));
+
+  const visibleIndices = indices.filter((idx) => !String(idx.index || "").startsWith("."));
+  const indicesCount = statsData?.indices?.count ?? (visibleIndices.length || indices.length);
+
+  // Shards
+  const activePrimaryShards = statsData?.indices?.shards?.primaries
+    ?? (clusterHealth?.active_shards !== undefined
+        ? clusterHealth.active_shards
+        : indices.reduce((acc, idx) => acc + (parseInt(idx.pri || "0", 10) || 0), 0));
+
+  const totalShards = statsData?.indices?.shards?.total
+    ?? (clusterHealth?.active_shards !== undefined && clusterHealth?.unassigned_shards !== undefined
+        ? clusterHealth.active_shards + clusterHealth.unassigned_shards
+        : indices.reduce((acc, idx) => acc + ((parseInt(idx.pri || "0", 10) || 0) + (parseInt(idx.rep || "0", 10) || 0)), activePrimaryShards));
+
+  const storeSizeBytes = statsData?.indices?.store?.size_in_bytes ?? null;
 
   const displayTopology = nodes.length > 0
     ? nodes.map((n) => ({
@@ -205,68 +261,66 @@ export default function HomePage({ onNavigateToTab, theme }) {
         cpu: n.cpu ? `${n.cpu}%` : "-",
         master: n.master === "*" || String(n["node.role"] || "").includes("m"),
       }))
-    : [
-        { name: "node-primary-01", ip: "10.0.0.12", cpu: "42%", master: true },
-        { name: "node-data-02",    ip: "10.0.0.13", cpu: "38%", master: false },
-        { name: "node-data-03",    ip: "10.0.0.14", cpu: "45%", master: false },
-      ];
+    : [];
 
   const stats = [
     {
       label: "Cluster Health",
       value: derivedStatus
         ? derivedStatus.charAt(0).toUpperCase() + derivedStatus.slice(1)
-        : (isLoading ? "Loading..." : "Green"),
-      sub: derivedStatus ? healthCfg.sub : "All nodes responsive",
+        : (isBackendOffline ? "Offline" : (isLoading ? "Loading..." : "Unknown")),
+      sub: derivedStatus ? healthCfg.sub : (isBackendOffline ? "Backend server unreachable" : "Waiting for cluster telemetry"),
       icon: ShieldIcon,
-      color: healthCfg.color,
-      bg: healthCfg.bg,
-      border: healthCfg.border,
-      sparkline: [20, 20, 20, 20, 20, 20],
-      sparkColor: healthCfg.sparkColor,
-      dot: healthCfg.dot,
+      color: isBackendOffline ? "text-rose-400" : healthCfg.color,
+      bg: isBackendOffline ? "bg-rose-500/10" : healthCfg.bg,
+      border: isBackendOffline ? "border-rose-500/20" : healthCfg.border,
+      sparkline: isBackendOffline ? [0, 0, 0, 0, 0, 0] : [20, 20, 20, 20, 20, 20],
+      sparkColor: isBackendOffline ? "#f43f5e" : healthCfg.sparkColor,
+      dot: isBackendOffline ? "bg-rose-500" : healthCfg.dot,
     },
     {
       label: "Active Nodes",
-      value: activeNodesCount > 0
-        ? `${activeNodesCount} Active`
-        : (isLoading ? "Loading..." : "0 Active"),
-      sub: activeNodesCount > 0
+      value: totalNodesCount > 0
+        ? `${totalNodesCount} Active`
+        : (isBackendOffline ? "Offline" : (isLoading ? "Loading..." : "0 Active")),
+      sub: totalNodesCount > 0
         ? (dataNodesCount > 0
-            ? `${dataNodesCount} data node${dataNodesCount === 1 ? "" : "s"}`
-            : `${activeNodesCount} total node${activeNodesCount === 1 ? "" : "s"}`)
-        : "No nodes responding",
+            ? `${dataNodesCount} data · ${masterNodesCount} master`
+            : (esVersions ? `Elasticsearch v${esVersions}` : `${totalNodesCount} total nodes`))
+        : (isBackendOffline ? "Backend unreachable" : "No nodes responding"),
       icon: ServerIcon,
-      color: "text-indigo-400",
-      bg: isDark ? "bg-indigo-500/10" : "bg-indigo-50",
-      border: isDark ? "border-indigo-500/20" : "border-indigo-200",
-      sparkline: [35, 45, 42, 50, 48, 42],
-      sparkColor: "#818cf8",
-      dot: activeNodesCount > 0 ? "bg-indigo-500" : "bg-slate-500",
+      color: isBackendOffline ? "text-rose-400" : "text-indigo-400",
+      bg: isBackendOffline ? "bg-rose-500/10" : (isDark ? "bg-indigo-500/10" : "bg-indigo-50"),
+      border: isBackendOffline ? "border-rose-500/20" : (isDark ? "border-indigo-500/20" : "border-indigo-200"),
+      sparkline: isBackendOffline ? [0, 0, 0, 0, 0, 0] : [35, 45, 42, 50, 48, 42],
+      sparkColor: isBackendOffline ? "#f43f5e" : "#818cf8",
+      dot: totalNodesCount > 0 ? "bg-indigo-500" : (isBackendOffline ? "bg-rose-500" : "bg-slate-500"),
     },
     {
       label: "Query Latency",
-      value: latencyData !== null ? `${latencyData}ms` : (isLoading ? "Loading..." : "1.2ms"),
-      sub: latencyData !== null ? "Elasticsearch API ping" : "Elasticsearch API ping",
+      value: latencyData !== null ? `${latencyData}ms` : (isBackendOffline ? "Offline" : (isLoading ? "Loading..." : "-")),
+      sub: latencyData !== null ? "Elasticsearch API ping (/cluster_info)" : (isBackendOffline ? "Backend unreachable" : "Elasticsearch API ping"),
       icon: ActivityIcon,
-      color: "text-purple-400",
-      bg: isDark ? "bg-purple-500/10" : "bg-purple-50",
-      border: isDark ? "border-purple-500/20" : "border-purple-200",
-      sparkline: latencyHistory.length >= 2 ? latencyHistory : [1.2, 1.3, 1.1, 1.8, 1.2, 1.2],
-      sparkColor: "#c084fc",
-      dot: "bg-purple-500",
+      color: isBackendOffline ? "text-rose-400" : "text-purple-400",
+      bg: isBackendOffline ? "bg-rose-500/10" : (isDark ? "bg-purple-500/10" : "bg-purple-50"),
+      border: isBackendOffline ? "border-rose-500/20" : (isDark ? "border-purple-500/20" : "border-purple-200"),
+      sparkline: isBackendOffline ? [0, 0, 0, 0, 0, 0] : (latencyHistory.length >= 2 ? latencyHistory : [0, 0, 0, 0, 0, 0]),
+      sparkColor: isBackendOffline ? "#f43f5e" : "#c084fc",
+      dot: isBackendOffline ? "bg-rose-500" : "bg-purple-500",
     },
     {
       label: "Total Docs",
-      value: totalDocs !== null ? formatDocsCount(totalDocs) : (isLoading ? "Loading..." : "0"),
-      sub: indicesCount > 0 ? `${indicesCount} ${indicesCount === 1 ? "index" : "indices"}` : "0 indices",
+      value: totalDocs !== null ? formatDocsCount(totalDocs) : (isBackendOffline ? "Offline" : (isLoading ? "Loading..." : "0")),
+      sub: indicesCount > 0
+        ? `${indicesCount} ${indicesCount === 1 ? "index" : "indices"}${storeSizeBytes !== null ? ` (${formatBytes(storeSizeBytes)})` : ""}`
+        : (isBackendOffline ? "Backend unreachable" : "0 indices"),
       icon: DatabaseIcon,
-      color: "text-blue-400",
-      bg: isDark ? "bg-blue-500/10" : "bg-blue-50",
-      border: isDark ? "border-blue-500/20" : "border-blue-200",
-      sparkline: [5.8, 5.9, 6.0, 6.1, 6.2, 6.3],
-      sparkColor: "#60a5fa",
-      dot: "bg-blue-500",
+      color: isBackendOffline ? "text-rose-400" : "text-blue-400",
+      bg: isBackendOffline ? "bg-rose-500/10" : (isDark ? "bg-blue-500/10" : "bg-blue-50"),
+      border: isBackendOffline ? "border-rose-500/20" : (isDark ? "border-blue-500/20" : "border-blue-200"),
+      sparkline: isBackendOffline ? [0, 0, 0, 0, 0, 0] : [5.8, 5.9, 6.0, 6.1, 6.2, 6.3],
+      sparkColor: isBackendOffline ? "#f43f5e" : "#60a5fa",
+      dot: isBackendOffline ? "bg-rose-500" : "bg-blue-500",
     },
   ];
 
@@ -285,19 +339,42 @@ export default function HomePage({ onNavigateToTab, theme }) {
         <BackButton />
       </div>
 
+      {/* ── BACKEND OFFLINE ALERT BANNER ── */}
+      {isBackendOffline && (
+        <div
+          role="alert"
+          className={`mb-6 p-4 rounded-xl border flex items-start sm:items-center justify-between gap-3 shadow-sm ${
+            isDark ? "bg-rose-950/20 border-rose-500/30 text-rose-300" : "bg-rose-50 border-rose-200 text-rose-800"
+          }`}
+        >
+          <div className="flex items-start sm:items-center gap-3">
+            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 flex-shrink-0 mt-1 sm:mt-0 animate-pulse" />
+            <div className="text-sm">
+              <span className="font-semibold text-rose-400">Backend Server Offline:</span> Cannot connect to{" "}
+              <code className={`font-mono text-xs px-1.5 py-0.5 rounded ${isDark ? "bg-[#1e2130] text-rose-300" : "bg-rose-100 text-rose-900"}`}>
+                {API_BASE_URL}
+              </code>
+              . Telemetry and cluster metrics are unavailable. Please ensure your Python backend service (<code>run.py</code>) is running.
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── HERO PANEL ── */}
       <div className="hero-panel">
         <div className="hero-grid">
           {/* Left copy */}
           <div className="flex flex-col justify-center min-w-0">
             <div className={`inline-flex items-center gap-2 h-7 px-3 rounded-full text-xs font-semibold leading-none w-fit border mb-4 ${
-              isDark ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-200" : "bg-emerald-100 border-emerald-300 text-emerald-800"
+              isBackendOffline
+                ? (isDark ? "bg-rose-500/20 border-rose-500/40 text-rose-300" : "bg-rose-100 border-rose-300 text-rose-800")
+                : (isDark ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-200" : "bg-emerald-100 border-emerald-300 text-emerald-800")
             }`}>
-              <span className={`w-2 h-2 rounded-full inline-block animate-pulse flex-shrink-0 ${healthCfg.dot}`} />
+              <span className={`w-2 h-2 rounded-full inline-block animate-pulse flex-shrink-0 ${isBackendOffline ? "bg-rose-500" : healthCfg.dot}`} />
               <span className="flex items-center gap-1.5 leading-none">
-                <span>{clusterHealth?.cluster_name || "elasticsearch"}</span>
+                <span>{isBackendOffline ? "backend offline" : clusterName}</span>
                 <span className="opacity-50">&middot;</span>
-                <span>{derivedStatus ? "connected" : "connecting..."}</span>
+                <span>{isBackendOffline ? "disconnected" : (derivedStatus ? "connected" : "connecting...")}</span>
               </span>
             </div>
 
@@ -350,52 +427,121 @@ export default function HomePage({ onNavigateToTab, theme }) {
                   </div>
                   <span className={`ml-1.5 text-xs font-mono font-medium leading-none ${isDark ? "text-slate-400" : "text-slate-500"}`}>cluster-topology</span>
                 </div>
-                <span className={`inline-flex items-center h-5 px-2 rounded text-[11px] font-mono font-medium border leading-none ${isDark ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-emerald-50 text-emerald-700 border-emerald-200"}`}>
-                  {nodes.length > 0 ? `${nodes.length} node${nodes.length === 1 ? "" : "s"} active` : "3 nodes active"}
+                <span className={`inline-flex items-center h-5 px-2 rounded text-[11px] font-mono font-medium border leading-none ${
+                  totalNodesCount > 0
+                    ? (isDark ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-emerald-50 text-emerald-700 border-emerald-200")
+                    : (isDark ? "bg-rose-500/10 text-rose-400 border-rose-500/20" : "bg-rose-50 text-rose-700 border-rose-200")
+                }`}>
+                  {totalNodesCount > 0 ? `${totalNodesCount} node${totalNodesCount === 1 ? "" : "s"} active` : (isBackendOffline ? "Backend offline" : "0 nodes active")}
                 </span>
               </div>
               <div className="p-3 flex flex-col gap-2">
-                {displayTopology.map((n) => (
-                  <div key={n.name} className={`flex items-center justify-between h-[54px] px-3 rounded-lg border transition-colors ${
-                    isDark ? "bg-[#0c0c10]/60 border-[#1e2130] hover:bg-[#1e2130]/50" : "bg-white border-slate-200 hover:bg-slate-100/80"
-                  }`}>
-                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                      <div className={`w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 border ${
-                        isDark ? "bg-indigo-500/10 border-indigo-500/20 text-indigo-400" : "bg-indigo-50 border-indigo-200 text-indigo-600"
-                      }`}>
-                        <ServerIcon className="w-3.5 h-3.5 flex-shrink-0" />
-                      </div>
-                      <div className="flex flex-col justify-center min-w-0">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <span className={`text-xs sm:text-[13px] font-mono font-medium truncate leading-none ${isDark ? "text-slate-100" : "text-slate-900"}`}>{n.name}</span>
-                          {n.master && (
-                            <span className={`inline-flex items-center h-3.5 px-1 rounded text-[9px] font-mono font-semibold uppercase tracking-wide leading-none flex-shrink-0 ${
-                              isDark ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30" : "bg-indigo-100 text-indigo-700 border border-indigo-200"
-                            }`}>
-                              master
-                            </span>
-                          )}
+                {displayTopology.length > 0 ? (
+                  displayTopology.map((n) => (
+                    <div key={n.name} className={`flex items-center justify-between h-[54px] px-3 rounded-lg border transition-colors ${
+                      isDark ? "bg-[#0c0c10]/60 border-[#1e2130] hover:bg-[#1e2130]/50" : "bg-white border-slate-200 hover:bg-slate-100/80"
+                    }`}>
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <div className={`w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 border ${
+                          isDark ? "bg-indigo-500/10 border-indigo-500/20 text-indigo-400" : "bg-indigo-50 border-indigo-200 text-indigo-600"
+                        }`}>
+                          <ServerIcon className="w-3.5 h-3.5 flex-shrink-0" />
                         </div>
-                        <span className={`text-[11px] font-mono leading-none mt-1 ${isDark ? "text-slate-500" : "text-slate-400"}`}>{n.ip}</span>
+                        <div className="flex flex-col justify-center min-w-0">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className={`text-xs sm:text-[13px] font-mono font-medium truncate leading-none ${isDark ? "text-slate-100" : "text-slate-900"}`}>{n.name}</span>
+                            {n.master && (
+                              <span className={`inline-flex items-center h-3.5 px-1 rounded text-[9px] font-mono font-semibold uppercase tracking-wide leading-none flex-shrink-0 ${
+                                isDark ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30" : "bg-indigo-100 text-indigo-700 border border-indigo-200"
+                              }`}>
+                                master
+                              </span>
+                            )}
+                          </div>
+                          <span className={`text-[11px] font-mono leading-none mt-1 ${isDark ? "text-slate-500" : "text-slate-400"}`}>{n.ip}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 flex-shrink-0 ml-2">
+                        <div className="flex flex-col items-end justify-center min-w-[40px]">
+                          <span className={`text-[10px] font-semibold tracking-wider uppercase leading-none ${isDark ? "text-slate-500" : "text-slate-400"}`}>CPU</span>
+                          <span className={`text-xs sm:text-[13px] font-mono font-semibold tabular-nums leading-none mt-1 ${isDark ? "text-slate-100" : "text-slate-900"}`}>{n.cpu}</span>
+                        </div>
+                        <div className="w-2.5 h-2.5 flex items-center justify-center flex-shrink-0">
+                          <span className={`w-2 h-2 rounded-full inline-block ${healthCfg.dot || "bg-emerald-500"}`} />
+                        </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 flex-shrink-0 ml-2">
-                      <div className="flex flex-col items-end justify-center min-w-[40px]">
-                        <span className={`text-[10px] font-semibold tracking-wider uppercase leading-none ${isDark ? "text-slate-500" : "text-slate-400"}`}>CPU</span>
-                        <span className={`text-xs sm:text-[13px] font-mono font-semibold tabular-nums leading-none mt-1 ${isDark ? "text-slate-100" : "text-slate-900"}`}>{n.cpu}</span>
+                  ))
+                ) : totalNodesCount > 0 ? (
+                  /* Display cluster node stats from _cluster/stats */
+                  <div className="flex flex-col gap-2">
+                    <div className={`p-3 rounded-lg border flex items-center justify-between ${
+                      isDark ? "bg-[#0c0c10]/60 border-[#1e2130]" : "bg-white border-slate-200"
+                    }`}>
+                      <div className="flex items-center gap-2.5">
+                        <div className={`w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 border ${
+                          isDark ? "bg-indigo-500/10 border-indigo-500/20 text-indigo-400" : "bg-indigo-50 border-indigo-200 text-indigo-600"
+                        }`}>
+                          <ServerIcon className="w-3.5 h-3.5" />
+                        </div>
+                        <div>
+                          <div className={`text-xs sm:text-[13px] font-medium ${isDark ? "text-slate-100" : "text-slate-900"}`}>
+                            Cluster Nodes
+                          </div>
+                          <div className={`text-[11px] ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+                            {dataNodesCount} data &middot; {masterNodesCount} master {ingestNodesCount > 0 ? `&middot; ${ingestNodesCount} ingest` : ""}
+                          </div>
+                        </div>
                       </div>
-                      <div className="w-2.5 h-2.5 flex items-center justify-center flex-shrink-0">
-                        <span className={`w-2 h-2 rounded-full inline-block ${healthCfg.dot || "bg-emerald-500"}`} />
+                      <div className="text-right">
+                        <span className={`text-xs font-mono font-semibold ${isDark ? "text-indigo-400" : "text-indigo-600"}`}>
+                          {totalNodesCount} Active
+                        </span>
+                        {esVersions && (
+                          <div className={`text-[10px] font-mono ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+                            v{esVersions}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className={`p-2.5 rounded-lg border ${isDark ? "bg-[#0c0c10]/40 border-[#1e2130]" : "bg-white border-slate-200"}`}>
+                        <div className={`text-[10px] uppercase font-semibold tracking-wider mb-1 ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+                          JVM Heap
+                        </div>
+                        <div className={`text-xs font-mono font-medium ${isDark ? "text-slate-200" : "text-slate-800"}`}>
+                          {statsData?.nodes?.jvm?.mem?.heap_used_in_bytes ? formatBytes(statsData.nodes.jvm.mem.heap_used_in_bytes) : "-"}
+                          {statsData?.nodes?.jvm?.mem?.heap_max_in_bytes ? ` / ${formatBytes(statsData.nodes.jvm.mem.heap_max_in_bytes)}` : ""}
+                        </div>
+                      </div>
+                      <div className={`p-2.5 rounded-lg border ${isDark ? "bg-[#0c0c10]/40 border-[#1e2130]" : "bg-white border-slate-200"}`}>
+                        <div className={`text-[10px] uppercase font-semibold tracking-wider mb-1 ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+                          Cluster Store
+                        </div>
+                        <div className={`text-xs font-mono font-medium ${isDark ? "text-slate-200" : "text-slate-800"}`}>
+                          {storeSizeBytes !== null ? formatBytes(storeSizeBytes) : "-"}
+                        </div>
                       </div>
                     </div>
                   </div>
-                ))}
+                ) : (
+                  <div className={`p-6 text-center rounded-lg border ${isDark ? "bg-[#0c0c10]/40 border-[#1e2130]" : "bg-white border-slate-200"}`}>
+                    <ServerIcon className={`w-6 h-6 mx-auto mb-2 ${isBackendOffline ? "text-rose-400" : "text-slate-400"}`} />
+                    <p className={`text-xs font-semibold ${isBackendOffline ? "text-rose-400" : (isDark ? "text-slate-300" : "text-slate-700")}`}>
+                      {isBackendOffline ? "Backend server is offline" : (isLoading ? "Connecting to cluster..." : "No connected nodes found")}
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      {isBackendOffline ? `Cannot connect to ${API_BASE_URL}` : "Cluster telemetry stream is inactive"}
+                    </p>
+                  </div>
+                )}
                 <div className={`h-8 px-3 rounded-lg flex items-center justify-between text-xs font-mono border ${
                   isDark ? "bg-[#0c0c10] border-[#1e2130]" : "bg-white border-slate-200"
                 }`}>
                   <span className={`leading-none ${isDark ? "text-slate-400" : "text-slate-500"}`}>active_shards</span>
-                  <span className="font-mono text-emerald-500 font-semibold leading-none">
-                    {indices.length > 0 ? `${activePrimaryShards} / ${totalShards || activePrimaryShards}` : "60 / 60"}
+                  <span className={`font-mono font-semibold leading-none ${isBackendOffline ? "text-rose-400" : "text-emerald-500"}`}>
+                    {totalShards > 0 ? `${activePrimaryShards} / ${totalShards}` : (isBackendOffline ? "Offline" : "0 / 0")}
                   </span>
                 </div>
               </div>

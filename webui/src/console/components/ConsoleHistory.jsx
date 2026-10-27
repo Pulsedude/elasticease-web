@@ -215,7 +215,7 @@ export default function ConsoleHistory({ entries, loadingCommand }) {
           <div className="console-empty-hints">
             <span className="console-hint">cluster:health</span>
             <span className="console-hint">index:list</span>
-            <span className="console-hint">node:list</span>
+            <span className="console-hint">nodes:list</span>
           </div>
         </div>
       </div>

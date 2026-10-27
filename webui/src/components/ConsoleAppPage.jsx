@@ -18,8 +18,9 @@ import { parseInput, hasTrailingSpace, currentArgIndex } from "../console/comman
 import { validateCommand } from "../console/commandValidator.js";
 import { getCommandSuggestions, getArgumentSuggestions } from "../console/suggestionEngine.js";
 import { createHistoryManager } from "../console/historyManager.js";
-import { executeCommand } from "../console/mockExecutor.js";
+import { executeCommand, fetchIndexCreate, fetchIndexDelete } from "../console/mockExecutor.js";
 import { getCommand } from "../console/commandRegistry.js";
+import { buildMappingDocument } from "../console/mappingBuilder.js";
 
 // Persistent across re-renders
 const historyManager = createHistoryManager();
@@ -42,6 +43,7 @@ export default function ConsoleAppPage({ theme }) {
   const [suggestionActiveIndex,setSuggestionActiveIndex]= useState(-1);
   const [showSuggestions,      setShowSuggestions]      = useState(true);
   const [validationError,      setValidationError]      = useState(null);
+  const [pendingPrompt,        setPendingPrompt]        = useState(null);
 
   const [activeArgIndex,       setActiveArgIndex]       = useState(-1);
 
@@ -51,7 +53,7 @@ export default function ConsoleAppPage({ theme }) {
   const parsed = useMemo(() => parseInput(inputValue), [inputValue]);
 
   const { commandSuggestions, argSuggestions, suggestionMode, argHint } = useMemo(() => {
-    if (!showSuggestions || !inputValue.trim()) {
+    if (!showSuggestions || !inputValue.trim() || pendingPrompt) {
       return { commandSuggestions: [], argSuggestions: [], suggestionMode: "command", argHint: null };
     }
 
@@ -78,7 +80,7 @@ export default function ConsoleAppPage({ theme }) {
 
     const cmdSugg = getCommandSuggestions(inputValue);
     return { commandSuggestions: cmdSugg, argSuggestions: [], suggestionMode: "command", argHint: null };
-  }, [inputValue, parsed, showSuggestions, activeArgIndex]);
+  }, [inputValue, parsed, showSuggestions, activeArgIndex, pendingPrompt]);
 
   const hasSuggestions   = commandSuggestions.length > 0 || argSuggestions.length > 0;
   const totalSuggestions = suggestionMode === "command" ? commandSuggestions.length : argSuggestions.length;
@@ -139,9 +141,159 @@ export default function ConsoleAppPage({ theme }) {
     setTimeout(() => inputRef.current?.focus(), 0);
   }, [suggestionMode, commandSuggestions, parsed, inputValue, activeArgIndex]);
 
+  const handleConfirmDelete = useCallback(async (indexName) => {
+    setLoadingCommand(`Deleting index '${indexName}'...`);
+    try {
+      const res = await fetchIndexDelete(indexName);
+      setHistoryEntries(prev => [...prev, { id: nextEntryId++, command: `delete: ${indexName}`, result: res }]);
+    } catch (err) {
+      setHistoryEntries(prev => [...prev, {
+        id: nextEntryId++,
+        command: `delete: ${indexName}`,
+        result: {
+          status: "error", statusCode: 500, durationMs: 0, format: "json",
+          data: { error: { reason: err.message || "Failed to delete index", status: 500 } },
+        },
+      }]);
+    } finally {
+      setLoadingCommand(null);
+      setPendingPrompt(null);
+      setInputValue("");
+      setTimeout(() => inputRef.current?.focus(), 0);
+    }
+  }, []);
+
+  const handleCancelPrompt = useCallback(() => {
+    if (pendingPrompt) {
+      const msg = pendingPrompt.type === "confirm_delete"
+        ? `Index deletion cancelled for index '${pendingPrompt.indexName}'. No data was deleted.`
+        : `Index creation cancelled for index '${pendingPrompt.indexName}'.`;
+      setHistoryEntries(prev => [...prev, {
+        id: nextEntryId++,
+        command: "cancel",
+        result: { status: "ok", statusCode: 200, durationMs: 0, format: "text", data: msg },
+      }]);
+      setPendingPrompt(null);
+      setInputValue("");
+      setTimeout(() => inputRef.current?.focus(), 0);
+    }
+  }, [pendingPrompt]);
+
   const handleSubmit = useCallback(async () => {
     const trimmed = inputValue.trim();
     if (!trimmed) return;
+
+    // ── Handle Pending Interactive Prompts ──
+    if (pendingPrompt) {
+      setShowSuggestions(false);
+      setValidationError(null);
+      const inputStr = trimmed;
+      const prompt = pendingPrompt;
+      setInputValue("");
+
+      if (prompt.type === "confirm_delete") {
+        const lower = inputStr.toLowerCase();
+        if (lower === "yes" || lower === "y" || lower === "true" || lower === "confirm") {
+          setLoadingCommand(`Deleting index '${prompt.indexName}'...`);
+          try {
+            const res = await fetchIndexDelete(prompt.indexName);
+            setHistoryEntries(prev => [...prev, { id: nextEntryId++, command: inputStr, result: res }]);
+          } catch (err) {
+            setHistoryEntries(prev => [...prev, {
+              id: nextEntryId++,
+              command: inputStr,
+              result: {
+                status: "error", statusCode: 500, durationMs: 0, format: "json",
+                data: { error: { reason: err.message || "Failed to delete index", status: 500 } },
+              },
+            }]);
+          } finally {
+            setLoadingCommand(null);
+            setPendingPrompt(null);
+            setTimeout(() => inputRef.current?.focus(), 0);
+          }
+        } else {
+          setHistoryEntries(prev => [...prev, {
+            id: nextEntryId++,
+            command: inputStr,
+            result: {
+              status: "ok",
+              statusCode: 200,
+              durationMs: 0,
+              format: "text",
+              data: `Index deletion cancelled for index '${prompt.indexName}'. No data was deleted.`,
+            },
+          }]);
+          setPendingPrompt(null);
+          setTimeout(() => inputRef.current?.focus(), 0);
+        }
+        return;
+      }
+
+      if (prompt.type === "input_mapping") {
+        const lower = inputStr.toLowerCase();
+        if (lower === "cancel" || lower === "abort" || lower === "exit") {
+          setHistoryEntries(prev => [...prev, {
+            id: nextEntryId++,
+            command: inputStr,
+            result: {
+              status: "ok",
+              statusCode: 200,
+              durationMs: 0,
+              format: "text",
+              data: `Index creation cancelled for index '${prompt.indexName}'.`,
+            },
+          }]);
+          setPendingPrompt(null);
+          setTimeout(() => inputRef.current?.focus(), 0);
+          return;
+        }
+
+        const mappingResult = buildMappingDocument(inputStr);
+        if (!mappingResult.valid) {
+          setHistoryEntries(prev => [...prev, {
+            id: nextEntryId++,
+            command: inputStr,
+            result: {
+              status: "error",
+              statusCode: 400,
+              durationMs: 0,
+              format: "text",
+              data: `Invalid field mappings: ${mappingResult.error}\n\nPlease try again (e.g. name=text, age=integer, email=keyword) or type 'cancel' to abort.`,
+            },
+          }]);
+          setTimeout(() => inputRef.current?.focus(), 0);
+          return;
+        }
+
+        setLoadingCommand(`Creating index '${prompt.indexName}' with custom schema mappings...`);
+        try {
+          const res = await fetchIndexCreate(prompt.indexName, true, mappingResult.mapping);
+          const displayData = res.status === "ok" && typeof res.data === "object"
+            ? { ...res.data, applied_mapping: mappingResult.mapping, schema_summary: mappingResult.summary }
+            : res.data;
+          setHistoryEntries(prev => [...prev, {
+            id: nextEntryId++,
+            command: `schema: ${inputStr}`,
+            result: { ...res, data: displayData },
+          }]);
+        } catch (err) {
+          setHistoryEntries(prev => [...prev, {
+            id: nextEntryId++,
+            command: `schema: ${inputStr}`,
+            result: {
+              status: "error", statusCode: 500, durationMs: 0, format: "json",
+              data: { error: { reason: err.message || "Failed to create index", status: 500 } },
+            },
+          }]);
+        } finally {
+          setLoadingCommand(null);
+          setPendingPrompt(null);
+          setTimeout(() => inputRef.current?.focus(), 0);
+        }
+        return;
+      }
+    }
 
     // If a suggestion is highlighted, select it
     if (hasSuggestions && suggestionActiveIndex >= 0) {
@@ -158,7 +310,58 @@ export default function ConsoleAppPage({ theme }) {
       return;
     }
 
-    // Execute
+    // Interactive command interception
+    if (parsed.commandName === "index:delete") {
+      const indexName = parsed.argMap.index || parsed.argTokens[0] || "";
+      const isConfirm = String(parsed.argMap.confirm ?? parsed.argTokens[1] ?? "").toLowerCase().trim() === "true";
+      if (!isConfirm) {
+        historyManager.push(trimmed);
+        setHistoryEntries(prev => [...prev, {
+          id: nextEntryId++,
+          command: trimmed,
+          result: {
+            status: "ok",
+            statusCode: 200,
+            durationMs: 0,
+            format: "text",
+            data: `⚠️ Confirmation required: Are you sure you want to permanently delete index '${indexName}' and ALL its data?\nType 'yes' or 'y' to confirm, or 'no' to abort.`,
+          },
+        }]);
+        setPendingPrompt({ type: "confirm_delete", indexName });
+        setInputValue("");
+        setActiveArgIndex(-1);
+        setTimeout(() => inputRef.current?.focus(), 0);
+        return;
+      }
+    }
+
+    if (parsed.commandName === "index:create") {
+      const indexName = parsed.argMap.index_name || parsed.argMap.index || parsed.argTokens[0] || "";
+      const withMappingRaw = String(parsed.argMap.with_mapping ?? parsed.argTokens[1] ?? "").toLowerCase().trim();
+      const withMapping = withMappingRaw === "true" || withMappingRaw === "1" || withMappingRaw === "yes";
+
+      if (withMapping) {
+        historyManager.push(trimmed);
+        setHistoryEntries(prev => [...prev, {
+          id: nextEntryId++,
+          command: trimmed,
+          result: {
+            status: "ok",
+            statusCode: 200,
+            durationMs: 0,
+            format: "text",
+            data: `📋 Custom schema mapping requested for index '${indexName}'.\nPlease enter the field definitions below.\nExample: name=text, age=integer, email=keyword, created_at=date\n(Or paste a JSON mapping document, or type 'cancel' to abort)`,
+          },
+        }]);
+        setPendingPrompt({ type: "input_mapping", indexName });
+        setInputValue("");
+        setActiveArgIndex(-1);
+        setTimeout(() => inputRef.current?.focus(), 0);
+        return;
+      }
+    }
+
+    // Execute standard command
     setShowSuggestions(false);
     setValidationError(null);
     setLoadingCommand(trimmed);
@@ -184,7 +387,7 @@ export default function ConsoleAppPage({ theme }) {
       setShowSuggestions(true);
       setTimeout(() => inputRef.current?.focus(), 0);
     }
-  }, [inputValue, parsed, hasSuggestions, suggestionActiveIndex, suggestionMode, commandSuggestions, argSuggestions, applySuggestion]);
+  }, [inputValue, parsed, hasSuggestions, suggestionActiveIndex, suggestionMode, commandSuggestions, argSuggestions, applySuggestion, pendingPrompt]);
 
   const handleArrowUp = useCallback(() => {
     if (hasSuggestions && showSuggestions) {
@@ -294,6 +497,40 @@ export default function ConsoleAppPage({ theme }) {
         />
       )}
 
+      {/* ── Interactive Prompt Banner (for confirm_delete or input_mapping) ── */}
+      {pendingPrompt && (
+        <div className="mx-4 mb-2 p-3 rounded-lg border flex items-center justify-between text-xs font-mono shadow-sm bg-[rgba(99,102,241,0.08)] border-[rgba(99,102,241,0.25)] text-[#c7d2fe]">
+          <div className="flex items-center gap-2">
+            <span className="text-[#818cf8] font-semibold">
+              {pendingPrompt.type === "confirm_delete" ? "⚠️ Delete Confirmation:" : "📋 Schema Mapping:"}
+            </span>
+            <span>
+              {pendingPrompt.type === "confirm_delete"
+                ? `Delete index '${pendingPrompt.indexName}'? Type 'yes' or click Confirm.`
+                : `Enter field definitions for '${pendingPrompt.indexName}' (e.g. name=text, age=integer) below.`}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            {pendingPrompt.type === "confirm_delete" && (
+              <button
+                type="button"
+                onClick={() => handleConfirmDelete(pendingPrompt.indexName)}
+                className="px-2.5 py-1 rounded bg-[#ef4444] hover:bg-[#dc2626] text-white text-[11px] font-medium transition cursor-pointer"
+              >
+                Confirm Delete
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleCancelPrompt}
+              className="px-2.5 py-1 rounded bg-[rgba(148,163,184,0.15)] hover:bg-[rgba(148,163,184,0.25)] text-[#cbd5e1] text-[11px] font-medium transition cursor-pointer"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Fixed bottom input ── */}
       <CommandInput
         ref={inputRef}
@@ -308,6 +545,13 @@ export default function ConsoleAppPage({ theme }) {
         validationError={validationError}
         disabled={Boolean(loadingCommand)}
         onArgFocusChange={setActiveArgIndex}
+        placeholder={
+          pendingPrompt?.type === "confirm_delete"
+            ? "Type 'yes' to confirm or 'no' to cancel..."
+            : pendingPrompt?.type === "input_mapping"
+            ? "Enter fields (e.g. name=text, age=integer) or 'cancel'..."
+            : "Type a command…"
+        }
       />
 
       <CommandPalette

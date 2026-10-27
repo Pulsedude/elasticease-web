@@ -11,10 +11,11 @@ import React from "react";
 
 const QUICK_COMMANDS = [
   { label: "cluster:health", command: "cluster:health" },
-  { label: "cluster:stats",  command: "cluster:stats"  },
   { label: "index:list",     command: "index:list"     },
-  { label: "index:search",   command: "index:search"   },
-  { label: "node:list",      command: "node:list"      },
+  { label: "index:inspect",  command: "index:inspect"  },
+  { label: "nodes:list",     command: "nodes:list"     },
+  { label: "node:inspect",   command: "node:inspect"   },
+  { label: "allocation:list",command: "allocation:list"},
   { label: "shards:list",    command: "shards:list"    },
 ];
 

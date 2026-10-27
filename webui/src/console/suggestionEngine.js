@@ -131,7 +131,11 @@ export function getArgumentSuggestions(commandName, argName, argType, partialInp
   } else if (argType === "node") {
     candidates = MOCK_NODES;
   } else if (argName === "info_type") {
-    candidates = ["mapping", "settings", "stats", "aliases"];
+    if (commandName === "node:inspect") {
+      candidates = ["os", "process", "jvm", "thread_pool", "transport", "http", "plugins", "ingest", "indices"];
+    } else {
+      candidates = ["mapping", "settings", "stats", "aliases"];
+    }
   } else if (argType === "enum") {
     // Handled by caller who has the options array
     return [];

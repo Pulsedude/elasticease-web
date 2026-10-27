@@ -14,6 +14,201 @@ const API_BASE_URL = typeof __API_BASE_URL__ !== "undefined"
   ? __API_BASE_URL__
   : (typeof __BACKEND_BASE_URL__ !== "undefined" ? __BACKEND_BASE_URL__ : "http://localhost:8000");
 
+/**
+ * Safely extracts human-readable error messages and technical details from API error payloads.
+ * Handles FastAPI HTTPException wrappers, detail objects, Elasticsearch root_cause/reason structures,
+ * arrays of validation errors, and strings without ever displaying "[object Object]".
+ */
+function extractErrorDetails(data) {
+  if (!data) return { message: "", raw: null };
+  if (typeof data === "string") return { message: data.trim(), raw: data };
+
+  let target = data;
+
+  // Handle FastAPI HTTPException standard structure: { detail: ... }
+  if (data.detail !== undefined && data.detail !== null) {
+    if (typeof data.detail === "string") {
+      return { message: data.detail.trim(), raw: data.detail };
+    }
+    // Handle array of validation errors (e.g. FastAPI 422 Unprocessable Entity)
+    if (Array.isArray(data.detail)) {
+      const messages = data.detail
+        .map((item) => {
+          if (typeof item === "string") return item;
+          const loc = Array.isArray(item?.loc) ? item.loc[item.loc.length - 1] : "";
+          const msg = item?.msg || "Validation error";
+          return loc ? `${loc}: ${msg}` : msg;
+        })
+        .filter(Boolean)
+        .join("; ");
+      return { message: messages || "Validation error", raw: data.detail };
+    }
+    if (typeof data.detail === "object") {
+      target = data.detail.error !== undefined ? data.detail.error : data.detail;
+    }
+  } else if (data.error !== undefined && data.error !== null) {
+    target = data.error;
+  }
+
+  // If target resolved to a string (e.g. str(e) from connection error or config error)
+  if (typeof target === "string") {
+    return { message: target.trim(), raw: target };
+  }
+
+  if (target && typeof target === "object") {
+    // Nested Elasticsearch error wrapper: { error: { root_cause: [...], reason: "...", type: "..." }, status: 401 }
+    const nested = target.error && typeof target.error === "object" ? target.error : target;
+
+    // 1. Elasticsearch root_cause is the most diagnostic message
+    if (Array.isArray(nested.root_cause) && nested.root_cause.length > 0) {
+      const rootReason = nested.root_cause[0]?.reason;
+      if (typeof rootReason === "string" && rootReason.trim()) {
+        return { message: rootReason.trim(), raw: target };
+      }
+    }
+
+    // 2. Direct reason field
+    if (typeof nested.reason === "string" && nested.reason.trim()) {
+      return { message: nested.reason.trim(), raw: target };
+    }
+
+    // 3. String error field
+    if (typeof target.error === "string" && target.error.trim()) {
+      return { message: target.error.trim(), raw: target };
+    }
+
+    // 4. Message field
+    if (typeof nested.message === "string" && nested.message.trim()) {
+      return { message: nested.message.trim(), raw: target };
+    }
+    if (typeof target.message === "string" && target.message.trim()) {
+      return { message: target.message.trim(), raw: target };
+    }
+
+    // 5. Response field
+    if (typeof target.response === "string" && target.response.trim()) {
+      return { message: target.response.trim(), raw: target };
+    }
+  }
+
+  return { message: "", raw: target };
+}
+
+/**
+ * Resolves an accurate, human-readable error message according to the response
+ * from /v1/core/auth and the underlying Elasticsearch/network status.
+ *
+ * NOTE: The backend route /v1/core/auth raises HTTPException(status_code=401, detail={"error": ...})
+ * on ANY failure returned by coreops.authenticate. Therefore, HTTP 401 status may represent:
+ *  1. Elasticsearch connectivity issue (connection refused / timed out / DNS failure)
+ *  2. SSL/TLS Certificate validation error
+ *  3. Configuration error (missing Elasticsearch base_url or verify_certs in config.yaml)
+ *  4. Permission / forbidden error (HTTP 403 from cluster)
+ *  5. Invalid credentials / unauthorized (actual 401 from Elasticsearch)
+ */
+function formatAuthErrorMessage(status, data) {
+  const { message, raw } = extractErrorDetails(data);
+
+  // Build a lowercased search corpus combining all available text
+  const searchCorpus = [
+    typeof message === "string" ? message : "",
+    typeof raw === "string" ? raw : "",
+    typeof data?.detail === "string" ? data.detail : "",
+    typeof data?.error === "string" ? data.error : "",
+  ].join(" ").toLowerCase();
+
+  // 1. Connection / unreachable cluster errors (takes precedence even if status is 401)
+  if (
+    searchCorpus.includes("connection") ||
+    searchCorpus.includes("refused") ||
+    searchCorpus.includes("actively refused") ||
+    searchCorpus.includes("10061") ||
+    searchCorpus.includes("111") ||
+    searchCorpus.includes("failed to establish a new connection") ||
+    searchCorpus.includes("max retries exceeded") ||
+    searchCorpus.includes("newconnectionerror") ||
+    searchCorpus.includes("connectionerror") ||
+    searchCorpus.includes("connecttimeout") ||
+    searchCorpus.includes("read timed out") ||
+    searchCorpus.includes("timed out") ||
+    searchCorpus.includes("nameresolutionerror") ||
+    searchCorpus.includes("getaddrinfo failed") ||
+    searchCorpus.includes("failed to resolve") ||
+    searchCorpus.includes("remote disconnected") ||
+    searchCorpus.includes("connection reset")
+  ) {
+    return "Cannot connect to Elasticsearch cluster. Please check if Elasticsearch is running and accessible at the configured URL.";
+  }
+
+  // 2. SSL/TLS Certificate verification errors
+  if (
+    searchCorpus.includes("certificate verify failed") ||
+    searchCorpus.includes("sslcertverificationerror") ||
+    searchCorpus.includes("sslerror") ||
+    searchCorpus.includes("self-signed certificate") ||
+    searchCorpus.includes("certificate_verify_failed")
+  ) {
+    return "SSL certificate verification failed. Check the verify_certs setting in config.yaml or your Elasticsearch SSL certificates.";
+  }
+
+  // 3. Elasticsearch configuration issues (missing URL or verify_certs in config.yaml)
+  if (
+    searchCorpus.includes("please check the elasticsearch configurations") ||
+    searchCorpus.includes("config.yaml") ||
+    searchCorpus.includes("failed to read config")
+  ) {
+    return "Elasticsearch configuration error: please verify your base URL and connection settings in config.yaml.";
+  }
+
+  // 4. Access forbidden / insufficient permissions (HTTP 403 or security_exception with unauthorized action)
+  if (
+    status === 403 ||
+    raw?.status === 403 ||
+    searchCorpus.includes("forbidden") ||
+    searchCorpus.includes("is unauthorized for user") ||
+    searchCorpus.includes("action [cluster:monitor/main] is unauthorized")
+  ) {
+    return "Access denied. Your Elasticsearch account does not have sufficient permissions to access the cluster.";
+  }
+
+  // 5. FastAPI Pydantic Validation error (HTTP 422)
+  if (status === 422) {
+    return message ? `Validation error: ${message}` : "Please provide a valid username and password.";
+  }
+
+  // 6. Authentication failure (Invalid username or password)
+  if (
+    status === 401 ||
+    raw?.status === 401 ||
+    searchCorpus.includes("unable to authenticate") ||
+    searchCorpus.includes("security_exception") ||
+    searchCorpus.includes("unauthorized") ||
+    searchCorpus.includes("failed to authorize") ||
+    searchCorpus.includes("bad credentials") ||
+    searchCorpus.includes("invalid credentials")
+  ) {
+    if (message && message.toLowerCase().includes("unable to authenticate user")) {
+      return `Invalid username or password (${message.trim()}).`;
+    }
+    return "Invalid username or password. Please check your Elasticsearch credentials.";
+  }
+
+  // 7. Internal Server Error (500, 502, 503, 504)
+  if (status >= 500) {
+    if (message) {
+      return `Backend server error: ${message}`;
+    }
+    return "Cannot connect to Elasticsearch cluster due to an internal server error. Please check backend logs.";
+  }
+
+  // 8. General fallback
+  if (message) {
+    return `Authentication failed: ${message}`;
+  }
+
+  return "Authentication failed. Please check your credentials and Elasticsearch cluster status.";
+}
+
 export default function LoginModal({ onLoginSuccess }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -23,14 +218,18 @@ export default function LoginModal({ onLoginSuccess }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isLoading) return;
     setErrorMsg("");
+
+    const trimmedUsername = username.trim();
+    const trimmedPassword = password.trim();
     
     // Client-side validation
-    if (!username.trim()) {
+    if (!trimmedUsername) {
       setErrorMsg("Please enter your username.");
       return;
     }
-    if (!password.trim()) {
+    if (!trimmedPassword) {
       setErrorMsg("Please enter your password.");
       return;
     }
@@ -39,7 +238,7 @@ export default function LoginModal({ onLoginSuccess }) {
 
     try {
       console.log("Calling auth API:", `${API_BASE_URL}/v1/core/auth`);
-      console.log("Sending credentials:", { username: username.trim(), password: "***" });
+      console.log("Sending credentials:", { username: trimmedUsername, password: "***" });
       
       // Call backend auth API with POST and credentials
       const response = await fetch(`${API_BASE_URL}/v1/core/auth`, {
@@ -48,43 +247,41 @@ export default function LoginModal({ onLoginSuccess }) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          username: username.trim(),
-          password: password.trim(),
+          username: trimmedUsername,
+          password: trimmedPassword,
         }),
       });
 
       console.log("Response status:", response.status);
       console.log("Response ok:", response.ok);
       
-      const data = await response.json();
+      let data = null;
+      try {
+        data = await response.json();
+      } catch {
+        // Non-JSON response body
+      }
       console.log("Response data:", data);
 
-      if (response.ok && data.success === true) {
+      if (response.ok && data?.success === true) {
         console.log("Login SUCCESS - redirecting");
         // Success: Elasticsearch is running and credentials are correct
         onLoginSuccess({
-          name: username.trim(),
+          name: trimmedUsername,
           role: "Cluster Administrator",
-          email: `${username.trim().toLowerCase().replace(/\s+/g, "")}@elasticease.io`,
+          email: `${trimmedUsername.toLowerCase().replace(/\s+/g, "")}@elasticease.io`,
+          clusterInfo: data.response || null,
           metadata: data.response || {},
         });
-      } else if (response.status === 401) {
-        console.log("Login FAILED - 401 Unauthorized");
-        // Wrong credentials
-        setErrorMsg("Invalid username or password. Please check your Elasticsearch credentials.");
-      } else if (response.status === 500) {
-        console.log("Login FAILED - 500 Server Error");
-        // Elasticsearch is not accessible
-        const errorDetail = data.detail?.error || "Unknown error";
-        setErrorMsg(`Cannot connect to Elasticsearch cluster. Please check if Elasticsearch is running. Error: ${errorDetail}`);
-      } else {
-        console.log("Login FAILED - Unexpected response");
-        // Other errors or unexpected response
-        setErrorMsg(`Authentication failed: ${data.detail?.error || "Unexpected response from server"}`);
+        return;
       }
+
+      // Handle all failure responses with accurate classification
+      const formattedError = formatAuthErrorMessage(response.status, data);
+      console.log("Login FAILED -", formattedError);
+      setErrorMsg(formattedError);
     } catch (error) {
       console.log("Login FAILED - Network error:", error);
-      // Network error or backend not running
       setErrorMsg(`Cannot connect to backend server at ${API_BASE_URL}. Please ensure the backend is running.`);
       console.error("Login error:", error);
     } finally {
@@ -241,10 +438,12 @@ export default function LoginModal({ onLoginSuccess }) {
     fontSize: "13px",
     color: "#f8fafc",
     outline: "none",
-    transition: "border 0.2s",
+    transition: "border 0.2s, opacity 0.2s",
     background: "rgba(15,23,42,0.7)",
     border: "1px solid rgba(42,42,58,0.9)",
     boxSizing: "border-box",
+    opacity: isLoading ? 0.65 : 1,
+    cursor: isLoading ? "not-allowed" : "text",
   };
 
   const buttonStyle = {
@@ -347,28 +546,51 @@ export default function LoginModal({ onLoginSuccess }) {
               aria-live="assertive"
               style={{
                 marginBottom: "20px",
-                padding: "12px 16px",
+                padding: "12px 14px",
                 borderRadius: "12px",
                 display: "flex",
-                alignItems: "center",
-                gap: "8px",
+                alignItems: "flex-start",
+                justifyContent: "space-between",
+                gap: "10px",
                 fontSize: "12px",
+                lineHeight: "1.5",
                 color: "#fca5a5",
-                background: "rgba(239,68,68,0.1)",
+                background: "rgba(239,68,68,0.12)",
                 border: "1px solid rgba(239,68,68,0.35)",
+                wordBreak: "break-word",
               }}
             >
-              <span
+              <div style={{ display: "flex", alignItems: "flex-start", gap: "8px", flex: "1" }}>
+                <span
+                  style={{
+                    width: "8px",
+                    height: "8px",
+                    borderRadius: "50%",
+                    backgroundColor: "#ef4444",
+                    display: "inline-block",
+                    flexShrink: "0",
+                    marginTop: "5px",
+                  }}
+                />
+                <span>{errorMsg}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setErrorMsg("")}
+                aria-label="Dismiss error message"
                 style={{
-                  width: "8px",
-                  height: "8px",
-                  borderRadius: "50%",
-                  backgroundColor: "#ef4444",
-                  display: "inline-block",
+                  background: "transparent",
+                  border: "none",
+                  color: "#f87171",
+                  cursor: "pointer",
+                  fontSize: "16px",
+                  lineHeight: "1",
+                  padding: "0 2px",
                   flexShrink: "0",
                 }}
-              />
-              {errorMsg}
+              >
+                &times;
+              </button>
             </div>
           )}
 
@@ -406,7 +628,11 @@ export default function LoginModal({ onLoginSuccess }) {
                   id="login-username-input"
                   type="text"
                   value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  disabled={isLoading}
+                  onChange={(e) => {
+                    setUsername(e.target.value);
+                    if (errorMsg) setErrorMsg("");
+                  }}
                   placeholder="Enter your username"
                   style={inputStyle}
                   autoComplete="username"
@@ -462,7 +688,11 @@ export default function LoginModal({ onLoginSuccess }) {
                   id="login-password-input"
                   type={showPassword ? "text" : "password"}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={isLoading}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (errorMsg) setErrorMsg("");
+                  }}
                   placeholder="Enter your password"
                   style={{ ...inputStyle, paddingRight: "44px" }}
                   autoComplete="current-password"
@@ -477,6 +707,7 @@ export default function LoginModal({ onLoginSuccess }) {
                 />
                 <button
                   type="button"
+                  disabled={isLoading}
                   onClick={() => setShowPassword((v) => !v)}
                   aria-label={showPassword ? "Hide password" : "Show password"}
                   style={{
@@ -487,7 +718,7 @@ export default function LoginModal({ onLoginSuccess }) {
                     background: "transparent",
                     border: "none",
                     color: "#64748b",
-                    cursor: "pointer",
+                    cursor: isLoading ? "not-allowed" : "pointer",
                     padding: "0",
                   }}
                 >
@@ -515,17 +746,20 @@ export default function LoginModal({ onLoginSuccess }) {
               }}
             >
               {isLoading ? (
-                <span
-                  className="animate-spin"
-                  style={{
-                    display: "inline-block",
-                    width: "18px",
-                    height: "18px",
-                    borderRadius: "50%",
-                    border: "2.5px solid rgba(255,255,255,0.3)",
-                    borderTopColor: "#fff",
-                  }}
-                />
+                <>
+                  <span
+                    className="animate-spin"
+                    style={{
+                      display: "inline-block",
+                      width: "16px",
+                      height: "16px",
+                      borderRadius: "50%",
+                      border: "2px solid rgba(255,255,255,0.3)",
+                      borderTopColor: "#fff",
+                    }}
+                  />
+                  <span>Signing in...</span>
+                </>
               ) : (
                 <>
                   <span>Sign In</span>
