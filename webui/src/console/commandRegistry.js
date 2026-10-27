@@ -53,12 +53,6 @@ export const COMMAND_REGISTRY = [
     category: "Cluster",
     arguments: [],
   },
-  {
-    name: "cluster:pending-tasks",
-    description: "List pending cluster tasks",
-    category: "Cluster",
-    arguments: [],
-  },
 
   // ── INDEX ─────────────────────────────────────────────────
   {
@@ -83,6 +77,40 @@ export const COMMAND_REGISTRY = [
     ],
   },
   {
+    name: "index:inspect",
+    description: "Inspect specific index details, mappings, settings, or stats",
+    category: "Index",
+    arguments: [
+      {
+        name: "index",
+        type: "index",
+        description: "Index name to inspect",
+        required: true,
+      },
+      {
+        name: "info_type",
+        type: "string",
+        description: "Type of information to inspect (e.g. mapping, settings, stats, aliases)",
+        required: true,
+        options: ["mapping", "settings", "stats", "aliases"],
+      },
+      {
+        name: "ai_summarization",
+        type: "boolean",
+        description: "Get AI powered summary (default: false)",
+        required: false,
+        options: ["true", "false"],
+      },
+      {
+        name: "json",
+        type: "boolean",
+        description: "Return raw JSON if true, formatted output if false (default: false)",
+        required: false,
+        options: ["true", "false"],
+      },
+    ],
+  },
+  {
     name: "index:search",
     description: "Inspect specific index details, mappings, settings, or stats",
     category: "Index",
@@ -98,6 +126,7 @@ export const COMMAND_REGISTRY = [
         type: "string",
         description: "Type of information (e.g. mapping, settings, stats)",
         required: false,
+        options: ["mapping", "settings", "stats", "aliases"],
       },
       {
         name: "json",
@@ -125,18 +154,32 @@ export const COMMAND_REGISTRY = [
   },
   {
     name: "index:create",
-    description: "Create a new index",
+    description: "Create a new index with optional custom schema mapping",
     category: "Index",
     arguments: [
-      { name: "index", required: true, type: "string", description: "Index name to create" },
+      { name: "index_name", required: true, type: "string", description: "Index name to create" },
+      {
+        name: "with_mapping",
+        required: false,
+        type: "boolean",
+        description: "Define custom field schema mappings (default: false)",
+        options: ["false", "true"],
+      },
     ],
   },
   {
     name: "index:delete",
-    description: "Delete an index permanently",
+    description: "Delete an existing index and its data permanently",
     category: "Index",
     arguments: [
       { name: "index", required: true, type: "index", description: "Index name to delete" },
+      {
+        name: "confirm",
+        required: false,
+        type: "boolean",
+        description: "Bypass confirmation prompt (default: false)",
+        options: ["true", "false"],
+      },
     ],
   },
   {
@@ -182,56 +225,43 @@ export const COMMAND_REGISTRY = [
 
   // ── NODE ──────────────────────────────────────────────────
   {
-    name: "node:list",
-    description: "List all nodes with roles, IP, and load",
-    category: "Node",
-    arguments: [],
-  },
-  {
-    name: "node:stats",
-    description: "Get statistics for all nodes",
-    category: "Node",
-    arguments: [],
-  },
-  {
-    name: "node:info",
-    description: "Get detailed node information",
+    name: "node:inspect",
+    description: "Inspect specific details of an active node (e.g. os, process, jvm, thread_pool)",
     category: "Node",
     arguments: [
-      { name: "node", required: false, type: "node", description: "Node name (omit for all)" },
+      {
+        name: "node",
+        type: "node",
+        description: "Node name or node ID to inspect",
+        required: true,
+      },
+      {
+        name: "info_type",
+        type: "string",
+        description: "Type of information (e.g. os, process, jvm, thread_pool, transport, http, plugins, ingest, indices)",
+        required: true,
+        options: ["os", "process", "jvm", "thread_pool", "transport", "http", "plugins", "ingest", "indices"],
+      },
+      {
+        name: "ai_summarization",
+        type: "boolean",
+        description: "Get AI powered summary (default: false)",
+        required: false,
+        options: ["true", "false"],
+      },
+      {
+        name: "json",
+        type: "boolean",
+        description: "Return raw JSON if true, formatted output if false (default: false)",
+        required: false,
+        options: ["true", "false"],
+      },
     ],
   },
   {
-    name: "node:hot-threads",
-    description: "Get hot threads report for nodes",
+    name: "allocation:list",
+    description: "View disk space utilization and shard allocation across active nodes",
     category: "Node",
-    arguments: [],
-  },
-
-  // ── SEARCH ────────────────────────────────────────────────
-  {
-    name: "search",
-    description: "Search documents in an index",
-    category: "Search",
-    arguments: [
-      { name: "index", required: true, type: "index", description: "Index to search" },
-      { name: "query", required: false, type: "query", description: "Search query string" },
-    ],
-  },
-  {
-    name: "search:count",
-    description: "Count documents matching a query",
-    category: "Search",
-    arguments: [
-      { name: "index", required: true, type: "index", description: "Index to count in" },
-    ],
-  },
-
-  // ── SHARDS ────────────────────────────────────────────────
-  {
-    name: "shards:list",
-    description: "List all shards with state and size",
-    category: "Shards",
     arguments: [
       {
         name: "json",
@@ -250,50 +280,103 @@ export const COMMAND_REGISTRY = [
     ],
   },
   {
-    name: "shards:unassigned",
-    description: "List unassigned shards with reasons",
+    name: "node:allocation",
+    description: "View disk space utilization and shard allocation across active nodes",
+    category: "Node",
+    arguments: [
+      {
+        name: "json",
+        type: "boolean",
+        description: "Return raw JSON if true, formatted table if false (default: false)",
+        required: false,
+        options: ["true", "false"],
+      },
+      {
+        name: "ai_summarization",
+        type: "boolean",
+        description: "Get AI powered summary (default: false)",
+        required: false,
+        options: ["true", "false"],
+      },
+    ],
+  },
+  {
+    name: "nodes:list",
+    description: "List all nodes with roles, IP, and load",
+    category: "Node",
+    arguments: [
+      {
+        name: "json",
+        type: "boolean",
+        description: "Return raw JSON if true, formatted table if false (default: false)",
+        required: false,
+        options: ["true", "false"],
+      },
+      {
+        name: "ai_summarization",
+        type: "boolean",
+        description: "Get AI powered summary (default: false)",
+        required: false,
+        options: ["true", "false"],
+      },
+    ],
+  },
+  {
+    name: "node:list",
+    description: "List all nodes with roles, IP, and load",
+    category: "Node",
+    arguments: [
+      {
+        name: "json",
+        type: "boolean",
+        description: "Return raw JSON if true, formatted table if false (default: false)",
+        required: false,
+        options: ["true", "false"],
+      },
+      {
+        name: "ai_summarization",
+        type: "boolean",
+        description: "Get AI powered summary (default: false)",
+        required: false,
+        options: ["true", "false"],
+      },
+    ],
+  },
+  {
+    name: "node:stats",
+    description: "Get statistics for all nodes",
+    category: "Node",
+    arguments: [],
+  },
+
+  // ── SHARDS ────────────────────────────────────────────────
+  {
+    name: "shards:list",
+    description: "List all shards with state and size (supports unassigned filter)",
     category: "Shards",
-    arguments: [],
-  },
-
-  // ── ALIASES ───────────────────────────────────────────────
-  {
-    name: "alias:list",
-    description: "List all index aliases",
-    category: "Aliases",
-    arguments: [],
-  },
-  {
-    name: "alias:get",
-    description: "Get aliases for a specific index",
-    category: "Aliases",
     arguments: [
-      { name: "index", required: true, type: "index", description: "Index name" },
+      {
+        name: "unassigned",
+        type: "boolean",
+        description: "Filter only unassigned shards (default: false)",
+        required: false,
+        options: ["false", "true"],
+      },
+      {
+        name: "json",
+        type: "boolean",
+        description: "Return raw JSON if true, formatted table if false (default: false)",
+        required: false,
+        options: ["true", "false"],
+      },
+      {
+        name: "ai_summarization",
+        type: "boolean",
+        description: "Get AI powered summary (default: false)",
+        required: false,
+        options: ["true", "false"],
+      },
     ],
-  },
-
-  // ── TEMPLATES ─────────────────────────────────────────────
-  {
-    name: "template:list",
-    description: "List all index templates",
-    category: "Templates",
-    arguments: [],
-  },
-  {
-    name: "template:get",
-    description: "Get a specific index template",
-    category: "Templates",
-    arguments: [
-      { name: "name", required: true, type: "string", description: "Template name" },
-    ],
-  },
-
-  // ── TASKS ─────────────────────────────────────────────────
-  {
-    name: "tasks:list",
-    description: "List currently running cluster tasks",
-    category: "Tasks",
-    arguments: [],
   },
 ];
 

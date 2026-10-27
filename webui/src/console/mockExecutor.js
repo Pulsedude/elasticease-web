@@ -212,10 +212,22 @@ async function fetchClusterHealth(parsed) {
     const durationMs = Math.round(performance.now() - startTime);
 
     if (!res.ok) {
-      return error(`API request failed with HTTP status ${res.status}`, res.status, durationMs);
+      let errMsg = `API request failed with HTTP status ${res.status}`;
+      try {
+        const errJson = await res.json();
+        if (errJson?.detail?.error) errMsg = typeof errJson.detail.error === "string" ? errJson.detail.error : JSON.stringify(errJson.detail.error);
+        else if (errJson?.detail) errMsg = typeof errJson.detail === "string" ? errJson.detail : JSON.stringify(errJson.detail);
+        else if (errJson?.error) errMsg = typeof errJson.error === "string" ? errJson.error : JSON.stringify(errJson.error);
+      } catch { }
+      return error(errMsg, res.status, durationMs);
     }
 
     const payload = await res.json();
+    if (payload && payload.success === false) {
+      const errMsg = payload.error || payload.response || "Failed to fetch cluster health";
+      return error(typeof errMsg === "string" ? errMsg : JSON.stringify(errMsg), 400, durationMs);
+    }
+
     const clusterData = (payload && payload.success && payload.response) ? payload.response : payload;
 
     if (isJson) {
@@ -225,12 +237,11 @@ async function fetchClusterHealth(parsed) {
     }
   } catch (err) {
     const durationMs = Math.round(performance.now() - startTime);
-    // Fallback to mock data if backend server is unavailable
-    if (isJson) {
-      return ok(MOCK_CLUSTER_HEALTH, "json", durationMs);
-    } else {
-      return ok(formatClusterHealthTable(MOCK_CLUSTER_HEALTH), "table", durationMs);
-    }
+    return error(
+      `Cannot connect to backend server at ${API_BASE_URL}. Backend is offline or not running (${err.message || "Failed to fetch"}).`,
+      503,
+      durationMs
+    );
   }
 }
 
@@ -241,12 +252,12 @@ function formatShardsTable(data) {
   // Columns for the _cat/shards endpoint
   const cols = ["index", "shard", "prirep", "state", "docs", "store", "ip", "node"];
   const widths = {};
-  
+
   // Initialize widths with header lengths
   for (const col of cols) {
     widths[col] = col.length;
   }
-  
+
   // Calculate max widths based on data
   for (const row of data) {
     for (const col of cols) {
@@ -259,7 +270,7 @@ function formatShardsTable(data) {
 
   // Generate header
   const header = cols.map(c => c.padEnd(widths[c])).join("  ");
-  
+
   // Generate rows
   const rows = data.map(row => {
     return cols.map(c => String(row[c] || "-").padEnd(widths[c])).join("  ");
@@ -270,20 +281,43 @@ function formatShardsTable(data) {
 
 async function fetchShardsList(parsed) {
   const startTime = performance.now();
-  const rawArg = String(parsed.argMap.json || "").toLowerCase().trim();
-  const isJson = rawArg === "true" || rawArg === "1" || rawArg === "yes";
-  const rawAiArg = String(parsed.argMap.ai_powered_response || "").toLowerCase().trim();
+  const rawUnassigned = String(parsed.argMap?.unassigned ?? parsed.argTokens?.[0] ?? "").toLowerCase().trim();
+  const isUnassigned = rawUnassigned === "true" || rawUnassigned === "1" || rawUnassigned === "yes";
+
+  // Json flag can be in named arg or 2nd positional token (or 1st if unassigned omitted)
+  let isJson = false;
+  if (parsed.argMap?.json !== undefined) {
+    const val = String(parsed.argMap.json).toLowerCase().trim();
+    isJson = val === "true" || val === "1" || val === "yes";
+  } else if (parsed.argTokens?.length >= 2) {
+    const val = String(parsed.argTokens[1]).toLowerCase().trim();
+    isJson = val === "true" || val === "1" || val === "yes";
+  }
+
+  const rawAiArg = String(parsed.argMap?.ai_summarization ?? parsed.argMap?.ai_summary ?? parsed.argTokens?.[2] ?? "").toLowerCase().trim();
   const isAi = rawAiArg === "true" || rawAiArg === "1" || rawAiArg === "yes";
 
   try {
-    const res = await fetch(`${API_BASE_URL}/v1/core/shards?ai_response=${isAi}`);
+    const res = await fetch(`${API_BASE_URL}/v1/core/shards?unassigned=${isUnassigned}&ai_summarization=${isAi}`);
     const durationMs = Math.round(performance.now() - startTime);
 
     if (!res.ok) {
-      return error(`API request failed with HTTP status ${res.status}`, res.status, durationMs);
+      let errMsg = `API request failed with HTTP status ${res.status}`;
+      try {
+        const errJson = await res.json();
+        if (errJson?.detail?.error) errMsg = typeof errJson.detail.error === "string" ? errJson.detail.error : JSON.stringify(errJson.detail.error);
+        else if (errJson?.detail) errMsg = typeof errJson.detail === "string" ? errJson.detail : JSON.stringify(errJson.detail);
+        else if (errJson?.error) errMsg = typeof errJson.error === "string" ? errJson.error : JSON.stringify(errJson.error);
+      } catch { }
+      return error(errMsg, res.status, durationMs);
     }
 
     const payload = await res.json();
+    if (payload && payload.success === false) {
+      const errMsg = payload.error || payload.response || "Failed to fetch shards list";
+      return error(typeof errMsg === "string" ? errMsg : JSON.stringify(errMsg), 400, durationMs);
+    }
+
     const shardsData = (payload && payload.success && payload.response) ? payload.response : payload;
     const aiResponse = (payload && payload.success && payload.ai_response) ? payload.ai_response : null;
 
@@ -294,21 +328,11 @@ async function fetchShardsList(parsed) {
     }
   } catch (err) {
     const durationMs = Math.round(performance.now() - startTime);
-    const mockAiResponse = isAi ? "This is a mock AI explanation of your shards. In a real environment, this would explain the shards status, health, and assignment." : null;
-    // Fallback to mock data if backend server is unavailable
-    if (isJson) {
-      const mockJson = [
-        { index: "users", shard: "0", prirep: "p", state: "STARTED", docs: "6228", store: "4.1mb", ip: "10.0.0.12", node: "node-primary-01" },
-        { index: "users", shard: "0", prirep: "r", state: "STARTED", docs: "6228", store: "4.1mb", ip: "10.0.0.13", node: "node-data-02" },
-        { index: "products", shard: "0", prirep: "p", state: "STARTED", docs: "820401", store: "248mb", ip: "10.0.0.14", node: "node-data-03" },
-        { index: "products", shard: "0", prirep: "r", state: "STARTED", docs: "820401", store: "248mb", ip: "10.0.0.12", node: "node-primary-01" },
-        { index: "orders", shard: "0", prirep: "p", state: "STARTED", docs: "160220", store: "105mb", ip: "10.0.0.13", node: "node-data-02" },
-        { index: "orders", shard: "0", prirep: "r", state: "UNASSIGNED", docs: "-", store: "-", ip: "-", node: "-" }
-      ];
-      return { ...ok(mockJson, "json", durationMs), aiResponse: mockAiResponse };
-    } else {
-      return { ...ok(MOCK_SHARDS_TABLE, "table", durationMs), aiResponse: mockAiResponse };
-    }
+    return error(
+      `Cannot connect to backend server at ${API_BASE_URL}. Backend is offline or not running (${err.message || "Failed to fetch"}).`,
+      503,
+      durationMs
+    );
   }
 }
 
@@ -318,11 +342,11 @@ function formatIndexTable(data) {
 
   const cols = ["health", "status", "index", "uuid", "pri", "rep", "docs.count", "docs.deleted", "store.size"];
   const widths = {};
-  
+
   for (const col of cols) {
     widths[col] = col.length;
   }
-  
+
   for (const row of data) {
     for (const col of cols) {
       const valLen = String(row[col] || "-").length;
@@ -333,7 +357,7 @@ function formatIndexTable(data) {
   }
 
   const header = cols.map(c => c.padEnd(widths[c])).join("  ");
-  
+
   const rows = data.map(row => {
     return cols.map(c => String(row[c] || "-").padEnd(widths[c])).join("  ");
   });
@@ -353,10 +377,22 @@ async function fetchIndexList(parsed) {
     const durationMs = Math.round(performance.now() - startTime);
 
     if (!res.ok) {
-      return error(`API request failed with HTTP status ${res.status}`, res.status, durationMs);
+      let errMsg = `API request failed with HTTP status ${res.status}`;
+      try {
+        const errJson = await res.json();
+        if (errJson?.detail?.error) errMsg = typeof errJson.detail.error === "string" ? errJson.detail.error : JSON.stringify(errJson.detail.error);
+        else if (errJson?.detail) errMsg = typeof errJson.detail === "string" ? errJson.detail : JSON.stringify(errJson.detail);
+        else if (errJson?.error) errMsg = typeof errJson.error === "string" ? errJson.error : JSON.stringify(errJson.error);
+      } catch {}
+      return error(errMsg, res.status, durationMs);
     }
 
     const payload = await res.json();
+    if (payload && payload.success === false) {
+      const errMsg = payload.error || payload.response || "Failed to fetch index list";
+      return error(typeof errMsg === "string" ? errMsg : JSON.stringify(errMsg), 400, durationMs);
+    }
+
     const indexData = (payload && payload.success && payload.response) ? payload.response : payload;
     const aiResponse = (payload && payload.success && payload.ai_response) ? payload.ai_response : null;
 
@@ -367,22 +403,100 @@ async function fetchIndexList(parsed) {
     }
   } catch (err) {
     const durationMs = Math.round(performance.now() - startTime);
-    const mockAiResponse = isAi ? "This is a mock AI explanation of your indices. It provides an overview of health and storage." : null;
-    
-    if (isJson) {
-      const mockJson = [
-        { health: "green", status: "open", index: "users", uuid: "aB1Cd2EfGhIjK", pri: "2", rep: "1", "docs.count": "12453", "docs.deleted": "102", "store.size": "8.2mb" },
-        { health: "green", status: "open", index: "products", uuid: "Lk3Mn4OpQrStU", pri: "3", rep: "1", "docs.count": "4102005", "docs.deleted": "8921", "store.size": "1.24gb" },
-        { health: "green", status: "open", index: "orders", uuid: "vW5Xy6ZaBcDeF", pri: "2", rep: "1", "docs.count": "320441", "docs.deleted": "4102", "store.size": "210.5mb" },
-        { health: "yellow", status: "open", index: "logs", uuid: "Gh7Ij8KlMnOpQ", pri: "4", rep: "1", "docs.count": "1420891", "docs.deleted": "0", "store.size": "842.0mb" },
-        { health: "green", status: "open", index: "analytics", uuid: "xZQMq_XDR8ix-11", pri: "3", rep: "1", "docs.count": "850210", "docs.deleted": "0", "store.size": "310.0mb" }
-      ];
-      return { ...ok(mockJson, "json", durationMs), aiResponse: mockAiResponse };
-    } else {
-      return { ...ok(MOCK_INDEX_LIST_TABLE, "table", durationMs), aiResponse: mockAiResponse };
-    }
+    return error(
+      `Cannot connect to backend server at ${API_BASE_URL}. Backend is offline or not running (${err.message || "Failed to fetch"}).`,
+      503,
+      durationMs
+    );
   }
 }
+
+function formatNodesTable(data) {
+  if (typeof data === "string") return data;
+  if (!Array.isArray(data)) return String(data);
+  if (data.length === 0) return "No nodes found.";
+
+  const first = data[0] || {};
+  const standardCols = ["ip", "heap.percent", "ram.percent", "cpu", "load_1m", "node.role", "master", "name"];
+  let cols = standardCols.filter(col => col in first);
+
+  if (cols.length === 0) {
+    const altCols = ["ip", "heap.%", "ram.%", "cpu", "node.role", "master", "name"];
+    cols = altCols.filter(col => col in first);
+  }
+
+  if (cols.length === 0) {
+    cols = Object.keys(first);
+  }
+
+  const widths = {};
+  for (const col of cols) {
+    widths[col] = col.length;
+  }
+
+  for (const row of data) {
+    for (const col of cols) {
+      const valLen = String(row[col] ?? "-").length;
+      if (valLen > widths[col]) {
+        widths[col] = valLen;
+      }
+    }
+  }
+
+  const header = cols.map(c => c.padEnd(widths[c])).join("  ");
+  const rows = data.map(row => {
+    return cols.map(c => String(row[c] ?? "-").padEnd(widths[c])).join("  ");
+  });
+
+  return [header, ...rows].join("\n");
+}
+
+async function fetchNodesList(parsed) {
+  const startTime = performance.now();
+  const rawArg = String(parsed.argMap.json ?? parsed.argTokens[0] ?? "").toLowerCase().trim();
+  const isJson = rawArg === "true" || rawArg === "1" || rawArg === "yes";
+  const rawAiArg = String(parsed.argMap.ai_summarization ?? parsed.argMap.ai_summary ?? parsed.argTokens[1] ?? "").toLowerCase().trim();
+  const isAi = rawAiArg === "true" || rawAiArg === "1" || rawAiArg === "yes";
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/v1/core/nodes?ai_response=${isAi}`);
+    const durationMs = Math.round(performance.now() - startTime);
+
+    if (!res.ok) {
+      let errMsg = `API request failed with HTTP status ${res.status}`;
+      try {
+        const errJson = await res.json();
+        if (errJson?.detail?.error) errMsg = typeof errJson.detail.error === "string" ? errJson.detail.error : JSON.stringify(errJson.detail.error);
+        else if (errJson?.detail) errMsg = typeof errJson.detail === "string" ? errJson.detail : JSON.stringify(errJson.detail);
+        else if (errJson?.error) errMsg = typeof errJson.error === "string" ? errJson.error : JSON.stringify(errJson.error);
+      } catch {}
+      return error(errMsg, res.status, durationMs);
+    }
+
+    const payload = await res.json();
+    if (payload && payload.success === false) {
+      const errMsg = payload.error || payload.response || "Failed to fetch nodes list";
+      return error(typeof errMsg === "string" ? errMsg : JSON.stringify(errMsg), 400, durationMs);
+    }
+
+    const nodesData = (payload && payload.success && payload.response !== undefined) ? payload.response : payload;
+    const aiResponse = (payload && (payload.ai_response || payload.ai_summary)) ? (payload.ai_response || payload.ai_summary) : null;
+
+    if (isJson) {
+      return { ...ok(nodesData, "json", durationMs), aiResponse };
+    } else {
+      return { ...ok(formatNodesTable(nodesData), "table", durationMs), aiResponse };
+    }
+  } catch (err) {
+    const durationMs = Math.round(performance.now() - startTime);
+    return error(
+      `Cannot connect to backend server at ${API_BASE_URL}. Backend is offline or not running (${err.message || "Failed to fetch"}).`,
+      503,
+      durationMs
+    );
+  }
+}
+
 
 function formatRowsToTable(rows, cols) {
   if (!rows || rows.length === 0) return null;
@@ -587,7 +701,7 @@ function formatIndexInspectTable(data, infoType) {
         flattenSettingsObj(v, fullKey);
       } else {
         if (!["number_of_shards", "number_of_replicas", "uuid", "provided_name", "creation_date"].includes(fullKey) &&
-            !["index.number_of_shards", "index.number_of_replicas", "index.uuid", "index.provided_name", "index.creation_date"].includes(fullKey)) {
+          !["index.number_of_shards", "index.number_of_replicas", "index.uuid", "index.provided_name", "index.creation_date"].includes(fullKey)) {
           rows.push({ key: `setting.${fullKey}`, value: String(v) });
         }
       }
@@ -717,7 +831,7 @@ function generateMockIndexInspectData(indexName, infoType) {
 async function fetchIndexInspect(parsed) {
   const startTime = performance.now();
 
-  const indexName = parsed.argMap.index_name || parsed.argTokens[0] || "";
+  const indexName = parsed.argMap.index || parsed.argMap.index_name || parsed.argTokens[0] || "";
 
   let infoType = "";
   let isJson = false;
@@ -731,24 +845,28 @@ async function fetchIndexInspect(parsed) {
     isAi = rawAi === "true" || rawAi === "1" || rawAi === "yes";
   } else {
     infoType = parsed.argMap.info_type || parsed.argTokens[1] || "";
-    const rawJsonArg = String(parsed.argMap.json ?? parsed.argTokens[2] ?? "").toLowerCase().trim();
+    const rawJsonArg = String(parsed.argMap.json ?? parsed.argTokens[3] ?? "").toLowerCase().trim();
     isJson = rawJsonArg === "true" || rawJsonArg === "1" || rawJsonArg === "yes";
-    const rawAiArg = String(parsed.argMap.ai_summarization ?? parsed.argTokens[3] ?? "").toLowerCase().trim();
+    const rawAiArg = String(parsed.argMap.ai_summarization ?? parsed.argTokens[2] ?? "").toLowerCase().trim();
     isAi = rawAiArg === "true" || rawAiArg === "1" || rawAiArg === "yes";
   }
 
-  let additionalEndpoint = (infoType || "").trim();
-  if (additionalEndpoint) {
-    additionalEndpoint = additionalEndpoint.startsWith("_") ? additionalEndpoint : `_${additionalEndpoint}`;
+  if (!indexName) {
+    return error("Missing required argument: <index>", 400, 0);
   }
+
+  // Backend coreops.index_info strips leading slash from name and prefixes /_ to info_type:
+  // f"/{index_name.strip('/')}/_{info_type}"
+  const cleanInfoType = (infoType || "").trim().replace(/^_/, "");
+  const cleanIndexName = indexName.trim().replace(/^\/+/, "");
 
   try {
     const res = await fetch(`${API_BASE_URL}/v1/core/index_inspect`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        name: indexName,
-        additional_endpoint: additionalEndpoint,
+        name: cleanIndexName,
+        info_type: cleanInfoType,
         ai_summarization: Boolean(isAi),
       }),
     });
@@ -759,9 +877,10 @@ async function fetchIndexInspect(parsed) {
       let errMsg = `API request failed with HTTP status ${res.status}`;
       try {
         const errJson = await res.json();
-        if (errJson?.detail?.error) errMsg = errJson.detail.error;
+        if (errJson?.detail?.error) errMsg = typeof errJson.detail.error === "string" ? errJson.detail.error : JSON.stringify(errJson.detail.error);
         else if (errJson?.detail) errMsg = typeof errJson.detail === "string" ? errJson.detail : JSON.stringify(errJson.detail);
-      } catch {}
+        else if (errJson?.error) errMsg = typeof errJson.error === "string" ? errJson.error : JSON.stringify(errJson.error);
+      } catch { }
       return error(errMsg, res.status, durationMs);
     }
 
@@ -776,7 +895,7 @@ async function fetchIndexInspect(parsed) {
     if (isJson) {
       return { ...ok(indexData, "json", durationMs), aiResponse };
     } else {
-      const formatted = formatIndexInspectTable(indexData, infoType);
+      const formatted = formatIndexInspectTable(indexData, cleanInfoType);
       if (formatted) {
         return { ...ok(formatted, "table", durationMs), aiResponse };
       }
@@ -784,21 +903,300 @@ async function fetchIndexInspect(parsed) {
     }
   } catch (err) {
     const durationMs = Math.round(performance.now() - startTime);
-    const mockAiResponse = isAi
-      ? `This is a mock AI summary for index "${indexName}". The index contains structured mappings and optimized shard configuration.`
-      : null;
+    return error(
+      `Cannot connect to backend server at ${API_BASE_URL}. Backend is offline or not running (${err.message || "Failed to fetch"}).`,
+      503,
+      durationMs
+    );
+  }
+}
 
-    const mockData = generateMockIndexInspectData(indexName, infoType);
+function formatAllocationTable(data) {
+  if (!Array.isArray(data)) return String(data);
+  if (data.length === 0) return "No allocation data found.";
+
+  const cols = ["shards", "disk.indices", "disk.used", "disk.avail", "disk.total", "disk.percent", "host", "ip", "node"];
+  return formatRowsToTable(data, cols) || JSON.stringify(data, null, 2);
+}
+
+async function fetchAllocation(parsed) {
+  const startTime = performance.now();
+  const rawJson = String(parsed.argMap?.json ?? parsed.argTokens?.[0] ?? "").toLowerCase().trim();
+  const isJson = rawJson === "true" || rawJson === "1" || rawJson === "yes";
+
+  const rawAi = String(parsed.argMap?.ai_summarization ?? parsed.argTokens?.[1] ?? "").toLowerCase().trim();
+  const isAi = rawAi === "true" || rawAi === "1" || rawAi === "yes";
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/v1/core/allocation?ai_summarization=${isAi}`, {
+      method: "POST",
+    });
+    const durationMs = Math.round(performance.now() - startTime);
+
+    if (!res.ok) {
+      let errMsg = `API request failed with HTTP status ${res.status}`;
+      try {
+        const errJson = await res.json();
+        if (errJson?.detail?.error) errMsg = typeof errJson.detail.error === "string" ? errJson.detail.error : JSON.stringify(errJson.detail.error);
+        else if (errJson?.detail) errMsg = typeof errJson.detail === "string" ? errJson.detail : JSON.stringify(errJson.detail);
+        else if (errJson?.error) errMsg = typeof errJson.error === "string" ? errJson.error : JSON.stringify(errJson.error);
+      } catch {}
+      return error(errMsg, res.status, durationMs);
+    }
+
+    const payload = await res.json();
+    if (payload && payload.success === false) {
+      const errMsg = payload.error || payload.response || "Failed to fetch disk allocation";
+      return error(typeof errMsg === "string" ? errMsg : JSON.stringify(errMsg), 400, durationMs);
+    }
+
+    const allocData = (payload && payload.success && payload.response !== undefined) ? payload.response : payload;
+    const aiResponse = (payload && (payload.ai_response || payload.ai_summary)) ? (payload.ai_response || payload.ai_summary) : null;
+
     if (isJson) {
-      return { ...ok(mockData, "json", durationMs), aiResponse: mockAiResponse };
+      return { ...ok(allocData, "json", durationMs), aiResponse };
     } else {
-      const formatted = formatIndexInspectTable(mockData, infoType);
-      if (formatted) {
-        return { ...ok(formatted, "table", durationMs), aiResponse: mockAiResponse };
-      }
-      return { ...ok(mockData, "json", durationMs), aiResponse: mockAiResponse };
+      return { ...ok(formatAllocationTable(allocData), "table", durationMs), aiResponse };
+    }
+  } catch (err) {
+    const durationMs = Math.round(performance.now() - startTime);
+    return error(
+      `Cannot connect to backend server at ${API_BASE_URL}. Backend is offline or not running (${err.message || "Failed to fetch"}).`,
+      503,
+      durationMs
+    );
+  }
+}
+
+function formatNodeInspectTable(data, infoType) {
+  if (typeof data === "string") return data;
+  if (!data || typeof data !== "object") return null;
+
+  let targetNode = data;
+  if (data.nodes && typeof data.nodes === "object") {
+    const nodeIds = Object.keys(data.nodes);
+    if (nodeIds.length > 0) {
+      targetNode = data.nodes[nodeIds[0]];
     }
   }
+
+  const rows = [];
+  if (targetNode.name) rows.push({ key: "Node Name", value: String(targetNode.name) });
+  if (targetNode.ip) rows.push({ key: "IP Address", value: String(targetNode.ip) });
+  if (targetNode.roles) {
+    rows.push({ key: "Roles", value: Array.isArray(targetNode.roles) ? targetNode.roles.join(", ") : String(targetNode.roles) });
+  }
+
+  const cleanType = (infoType || "").toLowerCase().replace(/^_/, "").trim();
+  const infoSection = cleanType && targetNode[cleanType] ? targetNode[cleanType] : targetNode;
+
+  function flattenNodeObj(obj, prefix = "") {
+    for (const [k, v] of Object.entries(obj)) {
+      if (k === "name" || k === "ip" || k === "roles") continue;
+      const fullKey = prefix ? `${prefix}.${k}` : k;
+      if (v && typeof v === "object" && !Array.isArray(v)) {
+        flattenNodeObj(v, fullKey);
+      } else {
+        rows.push({ key: fullKey, value: Array.isArray(v) ? v.join(", ") : String(v ?? "-") });
+      }
+    }
+  }
+
+  flattenNodeObj(infoSection);
+
+  if (rows.length > 0) {
+    return formatRowsToTable(rows, ["key", "value"]);
+  }
+  return null;
+}
+
+async function fetchNodeInspect(parsed) {
+  const startTime = performance.now();
+  const node = parsed.argMap?.node || parsed.argTokens?.[0] || "";
+  const infoType = parsed.argMap?.info_type || parsed.argTokens?.[1] || "";
+  
+  const rawAi = String(parsed.argMap?.ai_summarization ?? parsed.argTokens?.[2] ?? "").toLowerCase().trim();
+  const isAi = rawAi === "true" || rawAi === "1" || rawAi === "yes";
+
+  const rawJson = String(parsed.argMap?.json ?? parsed.argTokens?.[3] ?? "").toLowerCase().trim();
+  const isJson = rawJson === "true" || rawJson === "1" || rawJson === "yes";
+
+  if (!node) {
+    return error("Missing required argument: <node> (name or ID)", 400, 0);
+  }
+  if (!infoType) {
+    return error("Missing required argument: <info_type> (e.g. os, process, jvm, thread_pool, transport, http, plugins)", 400, 0);
+  }
+
+  const cleanInfoType = infoType.replace(/^_/, "");
+
+  try {
+    const url = `${API_BASE_URL}/v1/core/inspect_node?id_or_name=${encodeURIComponent(node)}&info_type=${encodeURIComponent(cleanInfoType)}&ai_summarization=${isAi}`;
+    const res = await fetch(url, { method: "GET" });
+    const durationMs = Math.round(performance.now() - startTime);
+
+    if (!res.ok) {
+      let errMsg = `API request failed with HTTP status ${res.status}`;
+      try {
+        const errJson = await res.json();
+        if (errJson?.detail?.error) errMsg = typeof errJson.detail.error === "string" ? errJson.detail.error : JSON.stringify(errJson.detail.error);
+        else if (errJson?.detail) errMsg = typeof errJson.detail === "string" ? errJson.detail : JSON.stringify(errJson.detail);
+        else if (errJson?.error) errMsg = typeof errJson.error === "string" ? errJson.error : JSON.stringify(errJson.error);
+      } catch {}
+      return error(errMsg, res.status, durationMs);
+    }
+
+    const payload = await res.json();
+    if (payload && payload.success === false) {
+      const errMsg = payload.error || payload.response || "Failed to inspect node";
+      return error(typeof errMsg === "string" ? errMsg : JSON.stringify(errMsg), 400, durationMs);
+    }
+
+    const nodeData = (payload && payload.success && payload.response !== undefined) ? payload.response : payload;
+    const aiResponse = (payload && (payload.ai_response || payload.ai_summary)) ? (payload.ai_response || payload.ai_summary) : null;
+
+    if (isJson) {
+      return { ...ok(nodeData, "json", durationMs), aiResponse };
+    } else {
+      const formatted = formatNodeInspectTable(nodeData, cleanInfoType);
+      if (formatted) {
+        return { ...ok(formatted, "table", durationMs), aiResponse };
+      }
+      return { ...ok(nodeData, "json", durationMs), aiResponse };
+    }
+  } catch (err) {
+    const durationMs = Math.round(performance.now() - startTime);
+    return error(
+      `Cannot connect to backend server at ${API_BASE_URL}. Backend is offline or not running (${err.message || "Failed to fetch"}).`,
+      503,
+      durationMs
+    );
+  }
+}
+
+export async function fetchIndexCreate(indexName, withMapping = false, mapping = {}) {
+  const startTime = performance.now();
+  const cleanName = String(indexName || "").trim().replace(/^\/+/, "");
+  if (!cleanName) {
+    return error("Index name is required to create an index.", 400, 0);
+  }
+
+  // Ensure leading slash for backend client URL concatenation: base_url + endpoint
+  const targetName = `/${cleanName}`;
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/v1/crud/create_index`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        index_name: targetName,
+        with_mapping: Boolean(withMapping),
+        mapping: mapping && typeof mapping === "object" ? mapping : {},
+      }),
+    });
+
+    const durationMs = Math.round(performance.now() - startTime);
+
+    if (!res.ok) {
+      let errMsg = `Failed to create index with HTTP ${res.status}`;
+      try {
+        const errJson = await res.json();
+        if (errJson?.detail?.error) errMsg = typeof errJson.detail.error === "string" ? errJson.detail.error : JSON.stringify(errJson.detail.error);
+        else if (errJson?.detail) errMsg = typeof errJson.detail === "string" ? errJson.detail : JSON.stringify(errJson.detail);
+        else if (errJson?.error) errMsg = typeof errJson.error === "string" ? errJson.error : JSON.stringify(errJson.error);
+      } catch {}
+      return error(errMsg, res.status, durationMs);
+    }
+
+    const payload = await res.json();
+    if (payload && payload.success === false) {
+      const errMsg = payload.error || payload.response || `Failed to create index '${cleanName}'`;
+      return error(typeof errMsg === "string" ? errMsg : JSON.stringify(errMsg), 400, durationMs);
+    }
+
+    const data = (payload && payload.response !== undefined) ? payload.response : payload;
+    return ok(data, "json", durationMs);
+  } catch (err) {
+    const durationMs = Math.round(performance.now() - startTime);
+    return error(
+      `Cannot connect to backend server at ${API_BASE_URL}. (${err.message || "Failed to create index"})`,
+      503,
+      durationMs
+    );
+  }
+}
+
+export async function fetchIndexDelete(indexName) {
+  const startTime = performance.now();
+  const cleanName = String(indexName || "").trim().replace(/^\/+/, "");
+  if (!cleanName) {
+    return error("Index name is required to delete an index.", 400, 0);
+  }
+
+  // Ensure leading slash for backend client URL concatenation: base_url + endpoint
+  const targetName = `/${cleanName}`;
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/v1/crud/delete_index?name=${encodeURIComponent(targetName)}`, {
+      method: "DELETE",
+    });
+
+    const durationMs = Math.round(performance.now() - startTime);
+
+    if (!res.ok) {
+      let errMsg = `Failed to delete index with HTTP ${res.status}`;
+      try {
+        const errJson = await res.json();
+        if (errJson?.detail?.error) errMsg = typeof errJson.detail.error === "string" ? errJson.detail.error : JSON.stringify(errJson.detail.error);
+        else if (errJson?.detail) errMsg = typeof errJson.detail === "string" ? errJson.detail : JSON.stringify(errJson.detail);
+        else if (errJson?.error) errMsg = typeof errJson.error === "string" ? errJson.error : JSON.stringify(errJson.error);
+      } catch {}
+      return error(errMsg, res.status, durationMs);
+    }
+
+    const payload = await res.json();
+    if (payload && payload.success === false) {
+      const errMsg = payload.error || payload.response || `Failed to delete index '${cleanName}'`;
+      return error(typeof errMsg === "string" ? errMsg : JSON.stringify(errMsg), 400, durationMs);
+    }
+
+    const data = (payload && payload.response !== undefined) ? payload.response : payload;
+    return ok(data, "json", durationMs);
+  } catch (err) {
+    const durationMs = Math.round(performance.now() - startTime);
+    return error(
+      `Cannot connect to backend server at ${API_BASE_URL}. (${err.message || "Failed to delete index"})`,
+      503,
+      durationMs
+    );
+  }
+}
+
+let lastBackendCheck = 0;
+let lastBackendStatus = false;
+
+/**
+ * Checks whether the backend server is reachable, with 3-second caching.
+ */
+async function checkBackendOnline() {
+  const now = Date.now();
+  if (now - lastBackendCheck < 3000) {
+    return lastBackendStatus;
+  }
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
+    const res = await fetch(`${API_BASE_URL}/v1/core/latency`, {
+      method: "GET",
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    lastBackendStatus = res.ok || res.status < 500;
+  } catch {
+    lastBackendStatus = false;
+  }
+  lastBackendCheck = now;
+  return lastBackendStatus;
 }
 
 /**
@@ -819,11 +1217,57 @@ export async function executeCommand(parsed) {
       case "cluster:health":
         return fetchClusterHealth(parsed);
 
+      case "cluster:nodes":
+      case "nodes:list":
+      case "node:list":
+        return fetchNodesList(parsed);
+
+      case "node:inspect":
+        return fetchNodeInspect(parsed);
+
+      case "allocation:list":
+      case "node:allocation":
+        return fetchAllocation(parsed);
+
+      case "shards:list":
+        return fetchShardsList(parsed);
+
+      case "index:list":
+        return fetchIndexList(parsed);
+
+      case "index:inspect":
+      case "index:search":
+        return fetchIndexInspect(parsed);
+
+      case "index:create": {
+        const indexName = parsed.argMap.index_name || parsed.argMap.index || parsed.argTokens[0];
+        const withMappingRaw = String(parsed.argMap.with_mapping ?? parsed.argTokens[1] ?? "").toLowerCase().trim();
+        const withMapping = withMappingRaw === "true" || withMappingRaw === "1" || withMappingRaw === "yes";
+        return fetchIndexCreate(indexName, withMapping, {});
+      }
+
+      case "index:delete": {
+        const indexName = parsed.argMap.index || parsed.argTokens[0];
+        return fetchIndexDelete(indexName);
+      }
+
+      default: {
+        // Before returning any mock-supported commands, verify the backend is online.
+        const isOnline = await checkBackendOnline();
+        if (!isOnline) {
+          return error(
+            `Cannot connect to backend server at ${API_BASE_URL}. Backend is offline or not running.`,
+            503,
+            latency
+          );
+        }
+        break;
+      }
+    }
+
+    switch (name) {
       case "cluster:stats":
         return ok(MOCK_CLUSTER_STATS, "json", latency);
-
-      case "cluster:nodes":
-        return ok(MOCK_CLUSTER_NODES, "json", latency);
 
       case "cluster:settings":
         return ok({
@@ -835,24 +1279,8 @@ export async function executeCommand(parsed) {
       case "cluster:pending-tasks":
         return ok({ tasks: [] }, "json", latency);
 
-      case "index:list":
-        return fetchIndexList(parsed);
-
-      case "index:search":
-        return fetchIndexInspect(parsed);
-
       case "index:get":
         return ok(mockIndexInfo(args.index || "unknown"), "json", latency);
-
-      case "index:create":
-        return ok({
-          acknowledged: true,
-          shards_acknowledged: true,
-          index: args.index,
-        }, "json", latency);
-
-      case "index:delete":
-        return ok({ acknowledged: true }, "json", latency);
 
       case "index:mappings":
         return ok({
@@ -886,16 +1314,13 @@ export async function executeCommand(parsed) {
       case "index:flush":
         return ok({ _shards: { total: 2, successful: 2, failed: 0 } }, "json", latency);
 
-      case "node:list":
-        return ok(MOCK_NODE_LIST_TABLE, "table", latency);
-
       case "node:stats":
         return ok({
           _nodes: { total: 3, successful: 3, failed: 0 },
           nodes: {
             "node-1-id": { name: "node-primary-01", jvm: { heap_used_percent: 42 }, os: { cpu: { percent: 4 } } },
-            "node-2-id": { name: "node-data-02",    jvm: { heap_used_percent: 38 }, os: { cpu: { percent: 2 } } },
-            "node-3-id": { name: "node-data-03",    jvm: { heap_used_percent: 45 }, os: { cpu: { percent: 5 } } },
+            "node-2-id": { name: "node-data-02", jvm: { heap_used_percent: 38 }, os: { cpu: { percent: 2 } } },
+            "node-3-id": { name: "node-data-03", jvm: { heap_used_percent: 45 }, os: { cpu: { percent: 5 } } },
           },
         }, "json", latency);
 
@@ -915,16 +1340,13 @@ export async function executeCommand(parsed) {
       case "search:count":
         return ok({ count: Math.floor(Math.random() * 50000), _shards: { total: 2, successful: 2, failed: 0 } }, "json", latency);
 
-      case "shards:list":
-        return fetchShardsList(parsed);
-
       case "shards:unassigned":
         return ok(`index   shard  prirep  state        reason
 orders  0      r       UNASSIGNED   NODE_LEFT[node-data-03]`, "table", latency);
 
       case "alias:list":
         return ok({
-          users:    { aliases: { current_users: {} } },
+          users: { aliases: { current_users: {} } },
           products: { aliases: { live_catalog: {}, catalog_v2: {} } },
         }, "json", latency);
 
@@ -934,7 +1356,7 @@ orders  0      r       UNASSIGNED   NODE_LEFT[node-data-03]`, "table", latency);
       case "template:list":
         return ok({
           index_templates: [
-            { name: "logs-template",    index_template: { index_patterns: ["logs-*"] } },
+            { name: "logs-template", index_template: { index_patterns: ["logs-*"] } },
             { name: "metrics-template", index_template: { index_patterns: ["metrics-*"] } },
           ],
         }, "json", latency);
