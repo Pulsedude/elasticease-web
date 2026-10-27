@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect, useLayoutEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import logo from "../assets/logo.png";
 import {
   MenuIcon, SunIcon, MoonIcon, LogOutIcon,
@@ -25,7 +25,10 @@ function parseEsHost(url) {
   }
 }
 
-function healthLabel(status) {
+function healthLabel(status, isBackendConnected) {
+  if (isBackendConnected === false) {
+    return { label: "Offline", color: "text-rose-400", dot: "bg-rose-500" };
+  }
   const s = (status || "").toLowerCase();
   if (s === "green")  return { label: "Green",   color: "text-emerald-500", dot: "bg-emerald-500" };
   if (s === "yellow") return { label: "Yellow",  color: "text-amber-400",   dot: "bg-amber-400"   };
@@ -33,7 +36,7 @@ function healthLabel(status) {
   return                     { label: "Checking…", color: "text-slate-400", dot: "bg-slate-400"   };
 }
 
-export default function Navbar({ user, onLogout, theme, toggleTheme, onOpenDrawer, clusterHealth }) {
+export default function Navbar({ user, onLogout, theme, toggleTheme, onOpenDrawer, clusterHealth, isBackendConnected }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [logoError, setLogoError] = useState(false);
   const [selectedAi, setSelectedAi] = useState(() => {
@@ -46,7 +49,7 @@ export default function Navbar({ user, onLogout, theme, toggleTheme, onOpenDrawe
   const isDark = theme === "dark";
 
   const esHost  = parseEsHost(ES_BASE_URL);
-  const health  = healthLabel(clusterHealth?.status);
+  const health  = healthLabel(clusterHealth?.status, isBackendConnected);
 
   // Compute dropdown position relative to viewport (fixed positioning).
   // This makes the dropdown escape the sticky .app-header stacking context
