@@ -220,7 +220,7 @@ class CoreOps:
                     "latency": response.get("latency")  # elastic API latency
                 }
 
-            return {"success": True, "status": "alive", "response": shards_data,  "latency": response.get("latency")} if unassigned is True else response.get("response")
+            return {"success": True, "status": "alive", "response": shards_data,  "latency": response.get("latency")} if unassigned is True else response
 
         except Exception as e:
             return {
@@ -308,11 +308,17 @@ class CoreOps:
                 "error": str(e)
             }
 
-    def inspect_node(self, id_or_name: str, info_type: str, ai_summarization: bool):
+    def inspect_node(self, id_or_name: str = None, info_type: str = None, ai_summarization: bool = None):
         """Inspect any such active node 
         """
         try:
-            response = self.client.get(f"/_nodes/{id_or_name}/{info_type}")
+            response = {}
+            
+            if id_or_name is not None:
+                response = self.client.get(f"/_nodes/{id_or_name}/{info_type}")
+            else:
+                response = self.client.get(f"/_nodes/{info_type}")
+            
             if response.get("success") is False:
                 return response
 
