@@ -206,7 +206,7 @@ def see_total_number_active_nodes(ai_summarization: bool = False):
         
         
 @router.get("/inspect_node", status_code=status.HTTP_200_OK, description="Retrieve information of connected & active Elasticsearch node")
-def inspect_active_node(id_or_name: str, info_type: str, ai_summarization: bool = False):
+def inspect_active_node(id_or_name: str = None, info_type: str = None, ai_summarization: bool = False):
     """Return the information of connected & active elasticsearch node 
     """
     try:

@@ -72,13 +72,7 @@ class CrudOps:
             
             # update document by following proper OCC Rule
             _seq_no, _primary_term = document.get("response").get("_seq_no"), document.get("response").get("_primary_term")
-            response = self.client.post(f"{index_name}/_update/{doc_id}?if_seq_no={_seq_no}&if_primary_term={_primary_term}", new_document)
-            
-            if response.get("response").get("error") is not None:
-                return {
-                    "success": False,
-                    "response": response.get("response")
-                }
+            response = self.client.post(f"/{index_name}/_update/{doc_id}?if_seq_no={_seq_no}&if_primary_term={_primary_term}", new_document)
             
             return response
             
@@ -88,7 +82,20 @@ class CrudOps:
                 "error": str(e)
             }
         
-        
+    def delete_doc(self, index_name: str, doc_id: str):
+        """Delete any such existing single document 
+        """
+        try:
+            response = self.client.delete(f"/{index_name}/_doc/{doc_id}")
+            
+            return response
+            
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }
+    
     def index_data_inspect(self, name: str, size: str):
         """Return the index along with their stored data (documents)
         """

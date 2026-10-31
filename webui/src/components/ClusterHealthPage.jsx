@@ -80,13 +80,18 @@ export default function ClusterHealthPage({ theme }) {
               }
             }
 
-            // Legacy fallbacks
+            // Fallback / direct properties if present in /cluster_info SSE payload
             if (payload.cluster_health) {
               setClusterData(payload.cluster_health);
             }
             if (Array.isArray(payload.total_nodes)) {
               setNodes(payload.total_nodes);
+            } else if (Array.isArray(payload.nodes)) {
+              setNodes(payload.nodes);
+            } else if (Array.isArray(payload.response?.nodes)) {
+              setNodes(payload.response.nodes);
             }
+
             if (Array.isArray(payload.indices)) {
               const allIndices = payload.indices;
               const nonSystem = allIndices.filter(
@@ -94,7 +99,15 @@ export default function ClusterHealthPage({ theme }) {
               );
               setIndices(nonSystem.length > 0 ? nonSystem : allIndices);
               setRawIndices(allIndices);
+            } else if (Array.isArray(payload.response?.indices)) {
+              const allIndices = payload.response.indices;
+              const nonSystem = allIndices.filter(
+                (idx) => !String(idx.index || "").startsWith(".")
+              );
+              setIndices(nonSystem.length > 0 ? nonSystem : allIndices);
+              setRawIndices(allIndices);
             }
+
             if (payload.total_docs !== undefined && payload.total_docs !== null) {
               setStreamTotalDocs(payload.total_docs);
             }
@@ -128,46 +141,6 @@ export default function ClusterHealthPage({ theme }) {
         eventSource.close();
       }
     };
-  }, []);
-
-  // ── 2. Fetch detailed node & index collections for tabular display ─────────
-  useEffect(() => {
-    let isMounted = true;
-    async function fetchDetails() {
-      try {
-        const [nodesRes, indicesRes] = await Promise.allSettled([
-          fetch(`${API_BASE_URL}/v1/core/nodes`),
-          fetch(`${API_BASE_URL}/v1/core/indices`),
-        ]);
-
-        if (!isMounted) return;
-
-        if (nodesRes.status === "fulfilled" && nodesRes.value.ok) {
-          const j = await nodesRes.value.json();
-          const list = j?.response || (Array.isArray(j) ? j : []);
-          if (Array.isArray(list) && list.length > 0) {
-            setNodes(list);
-          }
-        }
-
-        if (indicesRes.status === "fulfilled" && indicesRes.value.ok) {
-          const j = await indicesRes.value.json();
-          const list = j?.response || (Array.isArray(j) ? j : []);
-          if (Array.isArray(list) && list.length > 0) {
-            const nonSystem = list.filter(
-              (idx) => !String(idx.index || "").startsWith(".")
-            );
-            setIndices(nonSystem.length > 0 ? nonSystem : list);
-            setRawIndices(list);
-          }
-        }
-      } catch (err) {
-        console.warn("[ClusterHealth] Failed to fetch nodes/indices details:", err);
-      }
-    }
-
-    fetchDetails();
-    return () => { isMounted = false; };
   }, []);
 
   function getHealthConfig(statusStr) {
@@ -485,7 +458,7 @@ export default function ClusterHealthPage({ theme }) {
               ) : (
                 <tr>
                   <td colSpan="7" className="text-center py-6 text-sm text-secondary">
-                    {isBackendOffline ? "Cannot retrieve connected nodes: backend server is offline." : (isLoading ? "Fetching nodes via SSE stream..." : "No nodes found")}
+                    {isBackendOffline ? "Cannot retrieve connected nodes: backend server is offline." : (isLoading ? "Connecting to /cluster_info SSE stream..." : "No nodes found")}
                   </td>
                 </tr>
               )}
@@ -550,7 +523,7 @@ export default function ClusterHealthPage({ theme }) {
               ) : (
                 <tr>
                   <td colSpan="5" className="text-center py-6 text-sm text-secondary">
-                    {isBackendOffline ? "Cannot retrieve indices: backend server is offline." : (isLoading ? "Fetching indices via SSE stream..." : "No visible indices found")}
+                    {isBackendOffline ? "Cannot retrieve indices: backend server is offline." : (isLoading ? "Connecting to /cluster_info SSE stream..." : "No visible indices found")}
                   </td>
                 </tr>
               )}

@@ -44,10 +44,11 @@ function getPageContentClass(pathname) {
 }
 
 function AppContent() {
-  const [theme,         setTheme]        = useState(() => localStorage.getItem("elasticease_theme") || "dark");
-  const [user,          setUser]         = useState(readSessionUser);
-  const [drawerOpen,    setDrawerOpen]   = useState(false);
-  const [clusterHealth, setClusterHealth]= useState(null);
+  const [theme,              setTheme]             = useState(() => localStorage.getItem("elasticease_theme") || "dark");
+  const [user,               setUser]              = useState(readSessionUser);
+  const [drawerOpen,         setDrawerOpen]        = useState(false);
+  const [clusterHealth,      setClusterHealth]     = useState(null);
+  const [isBackendConnected, setIsBackendConnected]= useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -57,21 +58,50 @@ function AppContent() {
     localStorage.setItem("elasticease_theme", theme);
   }, [theme]);
 
-  // Poll cluster health for the Navbar status indicator
+  // Listen to cluster info SSE stream for the Navbar status indicator
   useEffect(() => {
     if (!user) return;
     let active = true;
-    async function fetchHealth() {
-      try {
-        const res = await fetch(`${API_BASE_URL}/v1/core/cluster_status`);
-        if (!res.ok) return;
-        const j = await res.json();
-        if (active && j?.success && j?.response) setClusterHealth(j.response);
-      } catch { /* silent */ }
+    let eventSource = null;
+
+    try {
+      eventSource = new EventSource(`${API_BASE_URL}/v1/core/cluster_info`);
+      eventSource.onmessage = (event) => {
+        if (!active) return;
+        try {
+          const payload = JSON.parse(event.data);
+          if (payload) {
+            if (payload.success === false) {
+              setIsBackendConnected(false);
+              return;
+            }
+            setIsBackendConnected(true);
+            const clusterStats = (payload.response && typeof payload.response === "object") ? payload.response : payload;
+            const status = clusterStats?.status || payload.cluster_health?.status;
+            if (status) {
+              setClusterHealth({
+                status,
+                cluster_name: clusterStats?.cluster_name || payload.cluster_health?.cluster_name
+              });
+            }
+          }
+        } catch { /* silent */ }
+      };
+      eventSource.onerror = (err) => {
+        if (!active) return;
+        setIsBackendConnected(false);
+        console.warn("[App] SSE cluster_info connection retry:", err);
+      };
+    } catch {
+      if (active) setIsBackendConnected(false);
     }
-    fetchHealth();
-    const id = setInterval(fetchHealth, 15_000);
-    return () => { active = false; clearInterval(id); };
+
+    return () => {
+      active = false;
+      if (eventSource) {
+        eventSource.close();
+      }
+    };
   }, [user]);
 
   const toggleTheme = () => setTheme(prev => prev === "dark" ? "light" : "dark");
@@ -114,6 +144,7 @@ function AppContent() {
             onOpenDrawer={() => setDrawerOpen(true)}
             activeTab={activeTab}
             clusterHealth={clusterHealth}
+            isBackendConnected={isBackendConnected}
           />
           <SidebarDrawer
             isOpen={drawerOpen}
@@ -163,13 +194,13 @@ function AppContent() {
       {showShell && !isConsolePage && (
         <footer className="app-footer">
           <div className="footer-left">
-            <span className={`font-semibold text-xs ${isDark ? "text-slate-500" : "text-slate-400"}`}>Elasticease Platform</span>
+            <span className={`font-semibold text-xs ${isDark ? "text-slate-500" : "text-slate-400"}`}>Elasticease Web</span>
             <span className={isDark ? "text-slate-700" : "text-slate-300"}>·</span>
-            <span className={`text-xs ${isDark ? "text-slate-600" : "text-slate-400"}`}>v1.0.0</span>
+            <span className={`text-xs ${isDark ? "text-slate-600" : "text-slate-400"}`}>v0.1.0</span>
           </div>
           <span className={`text-[11px] flex items-center gap-1.5 ${isDark ? "text-slate-700" : "text-slate-400"}`}>
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            Connected
+            <span className={`w-1.5 h-1.5 rounded-full ${isBackendConnected ? "bg-emerald-500" : "bg-rose-500"}`} />
+            {isBackendConnected ? "Connected" : "Backend Offline"}
           </span>
         </footer>
       )}

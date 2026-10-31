@@ -119,9 +119,8 @@ export default function HomePage({ onNavigateToTab, theme }) {
   const [clusterInfo, setClusterInfo] = useState(null);
   const [latencyData, setLatencyData] = useState(null);
   const [latencyHistory, setLatencyHistory] = useState([1.2, 1.3, 1.1, 1.8, 1.2, 1.2]);
-  const [fetchedNodes, setFetchedNodes] = useState([]);
 
-  // ── 1. SSE Stream: Real-time Cluster Info & Latency from /v1/core/cluster_info ──
+  // ── 1. SSE Stream: Real-time Cluster Info & Latency from /v1/core/cluster_info (ONLY backend route) ──
   useEffect(() => {
     let isMounted = true;
     let eventSource = null;
@@ -184,26 +183,6 @@ export default function HomePage({ onNavigateToTab, theme }) {
     };
   }, []);
 
-  // Fetch node details for topology visualization if available
-  useEffect(() => {
-    let isMounted = true;
-    async function loadNodes() {
-      try {
-        const res = await fetch(`${API_BASE_URL}/v1/core/nodes`);
-        if (!isMounted) return;
-        if (res.ok) {
-          const j = await res.json();
-          const list = j?.response || (Array.isArray(j) ? j : []);
-          if (Array.isArray(list)) setFetchedNodes(list);
-        }
-      } catch {
-        /* silent */
-      }
-    }
-    loadNodes();
-    return () => { isMounted = false; };
-  }, []);
-
   // ── Derived Data from SSE payload (from /_cluster/stats via /cluster_info) ──
   const statsData = (clusterInfo?.response && typeof clusterInfo.response === "object")
     ? clusterInfo.response
@@ -212,7 +191,9 @@ export default function HomePage({ onNavigateToTab, theme }) {
   const clusterHealth = clusterInfo?.cluster_health;
   const nodes = Array.isArray(clusterInfo?.total_nodes) && clusterInfo.total_nodes.length > 0
     ? clusterInfo.total_nodes
-    : (Array.isArray(fetchedNodes) ? fetchedNodes : []);
+    : (Array.isArray(clusterInfo?.nodes)
+        ? clusterInfo.nodes
+        : (Array.isArray(clusterInfo?.response?.nodes) ? clusterInfo.response.nodes : []));
   const indices = Array.isArray(clusterInfo?.indices) ? clusterInfo.indices : [];
 
   const derivedStatus = deriveClusterStatus(statsData, clusterHealth, indices);
@@ -328,7 +309,7 @@ export default function HomePage({ onNavigateToTab, theme }) {
     { title: "Interactive CLI Terminal",       desc: "Execute ES REST queries with formatted JSON responses and syntax highlighting.",   icon: TerminalIcon },
     { title: "Real-Time Health Telemetry",     desc: "Monitor node CPU, heap memory, GC events, and shard distribution.",               icon: ActivityIcon },
     { title: "Index Orchestration",            desc: "Create, reindex, alias, and update mapping schemas with built-in validation.",     icon: LayersIcon   },
-    { title: "Python Backend Integration",     desc: "Fully wired to your run.py backend — async requests, API proxying, secure auth.", icon: CpuIcon      },
+    { title: "Backend Integration",     desc: "Fully wired to your run.py backend — async requests, API proxying, secure auth.", icon: CpuIcon      },
   ];
 
   return (
@@ -628,14 +609,13 @@ export default function HomePage({ onNavigateToTab, theme }) {
             <CpuIcon className="w-4 h-4 text-indigo-400" /> Backend Connection Ready
           </h3>
           <p className={`text-xs ${isDark ? "text-slate-500" : "text-slate-400"}`}>
-            Frontend is configured to sync with your Python backend (run.py).
+            Frontend is configured to sync with your backend.
           </p>
         </div>
         <button onClick={() => onNavigateToTab("settings")} type="button" className="backend-config-button cursor-pointer">
           Configure Endpoints
         </button>
       </div>
-
     </div>
   );
 }

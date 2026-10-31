@@ -20,6 +20,17 @@
  *   }
  */
 
+import {
+  parseBulkDocuments,
+  fetchDocumentGet,
+  fetchDocumentInsert,
+  fetchDocumentUpdate,
+  fetchDocumentDelete,
+  fetchBulkInsert,
+  fetchBulkUpdate,
+  fetchBulkDelete,
+} from "./documentBuilder.js";
+
 // Fake network latency range
 const LATENCY_MIN = 8;
 const LATENCY_MAX = 80;
@@ -106,31 +117,6 @@ const MOCK_CLUSTER_NODES = {
   },
 };
 
-const MOCK_INDEX_LIST_TABLE = `health status  index              uuid                   pri rep docs.count store.size
-green  open    users              xZQMq_XDR8ix-01        2   1  12,453     8.2mb
-green  open    user_sessions      xZQMq_XDR8ix-02        1   1  89,201     24.1mb
-green  open    products           xZQMq_XDR8ix-03        5   1  4,102,005  1.24gb
-green  open    product_catalog    xZQMq_XDR8ix-04        3   1  58,892     112.3mb
-yellow open    orders             xZQMq_XDR8ix-05        2   1  320,441    210.5mb
-green  open    order_items        xZQMq_XDR8ix-06        3   1  980,112    488.6mb
-green  open    logs               xZQMq_XDR8ix-07        5   1  1,420,891  842.0mb
-green  open    app_logs           xZQMq_XDR8ix-08        3   1  280,440    156.2mb
-green  open    error_logs         xZQMq_XDR8ix-09        1   1  24,110     18.9mb
-green  open    metrics            xZQMq_XDR8ix-10        5   1  2,401,003  1.82gb
-green  open    analytics          xZQMq_XDR8ix-11        3   1  850,210    310.0mb`;
-
-const MOCK_NODE_LIST_TABLE = `ip           heap.%  ram.%  cpu  node.role           master  name
-10.0.0.12    42      78     4    cdfhilmrstw         *       node-primary-01
-10.0.0.13    38      74     2    cdfhilmrstw         -       node-data-02
-10.0.0.14    45      81     5    cdfhilmrstw         -       node-data-03`;
-
-const MOCK_SHARDS_TABLE = `index           shard  prirep  state       docs    store    ip           node
-users           0      p       STARTED     6228    4.1mb    10.0.0.12    node-primary-01
-users           0      r       STARTED     6228    4.1mb    10.0.0.13    node-data-02
-products        0      p       STARTED     820401  248mb    10.0.0.14    node-data-03
-products        0      r       STARTED     820401  248mb    10.0.0.12    node-primary-01
-orders          0      p       STARTED     160220  105mb    10.0.0.13    node-data-02
-orders          0      r       UNASSIGNED  -       -        -            -`;
 
 function mockIndexInfo(indexName) {
   const docs = { users: 12453, products: 4102005, orders: 320441, logs: 1420891, analytics: 850210 };
@@ -611,7 +597,45 @@ function formatIndexInspectTable(data, infoType) {
     }
   }
 
-  // 4. DEFAULT INSPECT RESPONSE (Comprehensive Index Overview)
+  // 4. Specific aliases inspection: e.g. index:aliases <index>
+  if (normalizedType.includes("alias")) {
+    const aliases = targetObj.aliases || (topKeys[0] && targetObj[topKeys[0]]?.aliases) || {};
+    const rows = [];
+    if (topKeys[0]) rows.push({ key: "Index Name", value: topKeys[0] });
+    const aliasNames = Object.keys(aliases);
+    if (aliasNames.length === 0) {
+      rows.push({ key: "Aliases", value: "No aliases configured" });
+    } else {
+      for (const a of aliasNames) {
+        rows.push({ key: `Alias: ${a}`, value: "Active" });
+      }
+    }
+    if (rows.length > 0) {
+      return formatRowsToTable(rows, ["key", "value"]);
+    }
+  }
+
+  // 5. Specific document count inspection: e.g. index:count <index>
+  if (normalizedType.includes("count")) {
+    const rows = [];
+    if (topKeys[0] && targetObj !== data && !topKeys[0].startsWith("_")) {
+      rows.push({ key: "Index Name", value: topKeys[0] });
+    }
+    if (targetObj.count !== undefined) {
+      rows.push({ key: "Document Count", value: String(targetObj.count) });
+    }
+    if (targetObj._shards) {
+      rows.push({ key: "shards.total", value: String(targetObj._shards.total ?? "-") });
+      rows.push({ key: "shards.successful", value: String(targetObj._shards.successful ?? "-") });
+      rows.push({ key: "shards.skipped", value: String(targetObj._shards.skipped ?? "-") });
+      rows.push({ key: "shards.failed", value: String(targetObj._shards.failed ?? "-") });
+    }
+    if (rows.length > 0) {
+      return formatRowsToTable(rows, ["key", "value"]);
+    }
+  }
+
+  // 6. DEFAULT INSPECT RESPONSE (Comprehensive Index Overview)
   // Combines General Metadata, Aliases, Shard/Doc metrics, Schema Fields, and Index Settings!
   const rows = [];
   const resolvedName = topKeys[0] || targetObj.settings?.index?.provided_name || targetObj.name || "Target Index";
@@ -828,36 +852,52 @@ function generateMockIndexInspectData(indexName, infoType) {
   };
 }
 
-async function fetchIndexInspect(parsed) {
+export async function fetchIndexInspect(parsed, info_type) {
   const startTime = performance.now();
 
-  const indexName = parsed.argMap.index || parsed.argMap.index_name || parsed.argTokens[0] || "";
-
-  let infoType = "";
-  let isJson = false;
-  let isAi = false;
-
-  const rawArg1 = parsed.argTokens[1] ? String(parsed.argTokens[1]).toLowerCase().trim() : "";
-  if (parsed.argTokens.length >= 2 && (rawArg1 === "true" || rawArg1 === "false")) {
-    infoType = "";
-    isJson = rawArg1 === "true";
-    const rawAi = parsed.argTokens[2] ? String(parsed.argTokens[2]).toLowerCase().trim() : "";
-    isAi = rawAi === "true" || rawAi === "1" || rawAi === "yes";
-  } else {
-    infoType = parsed.argMap.info_type || parsed.argTokens[1] || "";
-    const rawJsonArg = String(parsed.argMap.json ?? parsed.argTokens[3] ?? "").toLowerCase().trim();
-    isJson = rawJsonArg === "true" || rawJsonArg === "1" || rawJsonArg === "yes";
-    const rawAiArg = String(parsed.argMap.ai_summarization ?? parsed.argTokens[2] ?? "").toLowerCase().trim();
-    isAi = rawAiArg === "true" || rawAiArg === "1" || rawAiArg === "yes";
-  }
+  const indexName = parsed.argMap?.index || parsed.argMap?.index_name || parsed.argTokens?.[0] || "";
 
   if (!indexName) {
     return error("Missing required argument: <index>", 400, 0);
   }
 
+  // Determine info_type from parameter or fallback to parsed command / args
+  let effectiveInfoType = "";
+  if (info_type !== undefined && info_type !== null && String(info_type).trim().length > 0) {
+    effectiveInfoType = String(info_type).trim();
+  } else if (parsed.commandName) {
+    const cmd = parsed.commandName.toLowerCase();
+    if (cmd === "index:stats" || cmd === "index:stat") effectiveInfoType = "stats";
+    else if (cmd === "index:mappings" || cmd === "index:mapping") effectiveInfoType = "mapping";
+    else if (cmd === "index:settings" || cmd === "index:setting") effectiveInfoType = "settings";
+    else if (cmd === "index:aliases" || cmd === "index:alias") effectiveInfoType = "aliases";
+    else if (cmd === "index:count") effectiveInfoType = "count";
+    else effectiveInfoType = parsed.argMap?.info_type || "";
+  } else {
+    effectiveInfoType = parsed.argMap?.info_type || "";
+  }
+
+  // If info_type was still not determined and token 1 is not a boolean, treat token 1 as info_type
+  let isJson = false;
+  let isAi = false;
+
+  const boolTokens = ["true", "false", "yes", "no", "1", "0"];
+  if (!effectiveInfoType && parsed.argTokens?.[1] && !boolTokens.includes(String(parsed.argTokens[1]).toLowerCase())) {
+    effectiveInfoType = parsed.argTokens[1];
+    const rawJsonArg = String(parsed.argMap?.json ?? parsed.argTokens?.[2] ?? "").toLowerCase().trim();
+    isJson = rawJsonArg === "true" || rawJsonArg === "1" || rawJsonArg === "yes" || rawJsonArg === "json";
+    const rawAiArg = String(parsed.argMap?.ai_summarization ?? parsed.argMap?.ai_summarizatio ?? parsed.argMap?.ai_summary ?? parsed.argTokens?.[3] ?? "").toLowerCase().trim();
+    isAi = rawAiArg === "true" || rawAiArg === "1" || rawAiArg === "yes";
+  } else {
+    const rawJsonArg = String(parsed.argMap?.json ?? parsed.argTokens?.[1] ?? "").toLowerCase().trim();
+    isJson = rawJsonArg === "true" || rawJsonArg === "1" || rawJsonArg === "yes" || rawJsonArg === "json";
+    const rawAiArg = String(parsed.argMap?.ai_summarization ?? parsed.argMap?.ai_summarizatio ?? parsed.argMap?.ai_summary ?? parsed.argTokens?.[2] ?? "").toLowerCase().trim();
+    isAi = rawAiArg === "true" || rawAiArg === "1" || rawAiArg === "yes";
+  }
+
   // Backend coreops.index_info strips leading slash from name and prefixes /_ to info_type:
   // f"/{index_name.strip('/')}/_{info_type}"
-  const cleanInfoType = (infoType || "").trim().replace(/^_/, "");
+  const cleanInfoType = (effectiveInfoType || "").trim().replace(/^_/, "");
   const cleanIndexName = indexName.trim().replace(/^\/+/, "");
 
   try {
@@ -968,70 +1008,533 @@ async function fetchAllocation(parsed) {
   }
 }
 
+export function formatBytes(bytes) {
+  if (bytes === undefined || bytes === null || isNaN(bytes)) return "-";
+  const num = Number(bytes);
+  if (num === 0) return "0 B";
+  if (num < 0) return `${num} B`;
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB", "TB", "PB"];
+  const i = Math.floor(Math.log(num) / Math.log(k));
+  if (i < 0) return `${num} B`;
+  const idx = Math.min(i, sizes.length - 1);
+  const val = (num / Math.pow(k, idx)).toFixed(2);
+  return `${parseFloat(val)} ${sizes[idx]}`;
+}
+
+export function formatTimestamp(ms) {
+  if (!ms || isNaN(ms)) return "-";
+  try {
+    const d = new Date(Number(ms));
+    if (isNaN(d.getTime())) return String(ms);
+    return d.toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC");
+  } catch {
+    return String(ms);
+  }
+}
+
+export function formatDuration(ms) {
+  if (!ms || isNaN(ms)) return "-";
+  const totalSeconds = Math.floor(Number(ms) / 1000);
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const parts = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0) parts.push(`${minutes}m`);
+  if (seconds > 0 && days === 0) parts.push(`${seconds}s`);
+  return parts.join(" ") || "0s";
+}
+
 function formatNodeInspectTable(data, infoType) {
   if (typeof data === "string") return data;
   if (!data || typeof data !== "object") return null;
 
-  let targetNode = data;
+  const cleanType = (infoType || "").toLowerCase().replace(/^_/, "").trim();
+
   if (data.nodes && typeof data.nodes === "object") {
     const nodeIds = Object.keys(data.nodes);
-    if (nodeIds.length > 0) {
-      targetNode = data.nodes[nodeIds[0]];
+    if (nodeIds.length === 0) return "No node information found.";
+
+    // Multi-node JVM comparison table
+    if (nodeIds.length > 1 && cleanType === "jvm") {
+      const rows = [];
+      for (const nid of nodeIds) {
+        const targetNode = data.nodes[nid];
+        const jvm = targetNode.jvm || {};
+        const heapMax = jvm.mem?.heap_max_in_bytes ? formatBytes(jvm.mem.heap_max_in_bytes) : "-";
+        const heapInit = jvm.mem?.heap_init_in_bytes ? formatBytes(jvm.mem.heap_init_in_bytes) : "-";
+        const gc = Array.isArray(jvm.gc_collectors) ? jvm.gc_collectors.join(", ") : String(jvm.gc_collectors || "-");
+        const uptime = jvm.start_time_in_millis ? formatDuration(Date.now() - jvm.start_time_in_millis) : "-";
+
+        rows.push({
+          NODE: targetNode.name || nid,
+          IP: targetNode.ip || "-",
+          "JVM VERSION": jvm.version || "-",
+          "VM NAME": jvm.vm_name || "-",
+          "HEAP INIT": heapInit,
+          "HEAP MAX": heapMax,
+          "GC COLLECTORS": gc,
+          UPTIME: uptime,
+        });
+      }
+      return formatRowsToTable(rows, ["NODE", "IP", "JVM VERSION", "VM NAME", "HEAP INIT", "HEAP MAX", "GC COLLECTORS", "UPTIME"]);
+    }
+
+    // Single node or detailed inspection
+    if (nodeIds.length === 1 || cleanType === "jvm") {
+      const targetNode = data.nodes[nodeIds[0]];
+      const rows = [];
+      if (targetNode.name) rows.push({ PROPERTY: "Node Name", VALUE: String(targetNode.name) });
+      if (targetNode.ip) rows.push({ PROPERTY: "IP Address", VALUE: String(targetNode.ip) });
+      if (targetNode.roles) {
+        rows.push({ PROPERTY: "Roles", VALUE: Array.isArray(targetNode.roles) ? targetNode.roles.join(", ") : String(targetNode.roles) });
+      }
+
+      if (cleanType === "jvm") {
+        const jvm = targetNode.jvm || targetNode;
+        if (jvm.pid) rows.push({ PROPERTY: "Process ID (PID)", VALUE: String(jvm.pid) });
+        if (jvm.version) rows.push({ PROPERTY: "JVM Version", VALUE: String(jvm.version) });
+        if (jvm.vm_name) rows.push({ PROPERTY: "VM Name", VALUE: String(jvm.vm_name) });
+        if (jvm.vm_vendor) rows.push({ PROPERTY: "VM Vendor", VALUE: String(jvm.vm_vendor) });
+        if (jvm.vm_version) rows.push({ PROPERTY: "VM Version", VALUE: String(jvm.vm_version) });
+        if (jvm.start_time_in_millis) {
+          rows.push({ PROPERTY: "Start Time", VALUE: formatTimestamp(jvm.start_time_in_millis) });
+          rows.push({ PROPERTY: "Uptime", VALUE: formatDuration(Date.now() - jvm.start_time_in_millis) });
+        }
+
+        // Memory
+        if (jvm.mem) {
+          if (jvm.mem.heap_init_in_bytes !== undefined) rows.push({ PROPERTY: "Heap Initial", VALUE: formatBytes(jvm.mem.heap_init_in_bytes) });
+          if (jvm.mem.heap_max_in_bytes !== undefined) rows.push({ PROPERTY: "Heap Max", VALUE: formatBytes(jvm.mem.heap_max_in_bytes) });
+          if (jvm.mem.non_heap_init_in_bytes !== undefined) rows.push({ PROPERTY: "Non-Heap Initial", VALUE: formatBytes(jvm.mem.non_heap_init_in_bytes) });
+          if (jvm.mem.non_heap_max_in_bytes !== undefined) rows.push({ PROPERTY: "Non-Heap Max", VALUE: formatBytes(jvm.mem.non_heap_max_in_bytes) });
+          if (jvm.mem.direct_max_in_bytes !== undefined) rows.push({ PROPERTY: "Direct Max Memory", VALUE: formatBytes(jvm.mem.direct_max_in_bytes) });
+        }
+
+        // GC & Pools
+        if (jvm.gc_collectors) {
+          rows.push({ PROPERTY: "GC Collectors", VALUE: Array.isArray(jvm.gc_collectors) ? jvm.gc_collectors.join(", ") : String(jvm.gc_collectors) });
+        }
+        if (jvm.memory_pools) {
+          rows.push({ PROPERTY: "Memory Pools", VALUE: Array.isArray(jvm.memory_pools) ? jvm.memory_pools.join(", ") : String(jvm.memory_pools) });
+        }
+        if (jvm.using_compressed_ordinary_object_pointers !== undefined) {
+          rows.push({ PROPERTY: "Compressed OOPs", VALUE: String(jvm.using_compressed_ordinary_object_pointers) });
+        }
+        if (jvm.using_bundled_jdk !== undefined) {
+          rows.push({ PROPERTY: "Bundled JDK", VALUE: String(jvm.using_bundled_jdk) });
+        }
+
+        // Configured Input Arguments
+        if (Array.isArray(jvm.input_arguments) && jvm.input_arguments.length > 0) {
+          rows.push({ PROPERTY: "Total JVM Arguments", VALUE: `${jvm.input_arguments.length} flags configured` });
+          jvm.input_arguments.forEach((arg, i) => {
+            rows.push({ PROPERTY: `JVM Arg [${i + 1}]`, VALUE: String(arg) });
+          });
+        }
+
+        return formatRowsToTable(rows, ["PROPERTY", "VALUE"]);
+      }
+
+      // For other info types (settings, os, process, etc.)
+      const infoSection = cleanType && targetNode[cleanType] !== undefined ? targetNode[cleanType] : targetNode;
+
+      function flattenSingle(obj, prefix = "") {
+        if (Array.isArray(obj)) {
+          if (obj.length === 0) {
+            rows.push({ PROPERTY: prefix || cleanType, VALUE: "None" });
+          } else if (obj.every(x => typeof x !== "object" || x === null)) {
+            rows.push({ PROPERTY: prefix || cleanType, VALUE: obj.join(", ") });
+          } else {
+            obj.forEach((item, idx) => {
+              if (item && typeof item === "object") {
+                const label = item.name ? `${prefix ? `${prefix}.` : ""}${item.name}` : `${prefix ? `${prefix}[${idx}]` : `[${idx}]`}`;
+                const details = [
+                  item.version ? `v${item.version}` : null,
+                  item.description || null,
+                  item.type || null,
+                ].filter(Boolean).join(" - ") || JSON.stringify(item);
+                rows.push({ PROPERTY: label, VALUE: details });
+              } else {
+                rows.push({ PROPERTY: `${prefix}[${idx}]`, VALUE: String(item ?? "-") });
+              }
+            });
+          }
+          return;
+        }
+
+        if (obj && typeof obj === "object") {
+          for (const [k, v] of Object.entries(obj)) {
+            if (k === "name" || k === "ip" || k === "roles") continue;
+            const fullKey = prefix ? `${prefix}.${k}` : k;
+            if (v && typeof v === "object" && !Array.isArray(v)) {
+              flattenSingle(v, fullKey);
+            } else if (Array.isArray(v)) {
+              if (v.length === 0) {
+                rows.push({ PROPERTY: fullKey, VALUE: "None" });
+              } else if (v.every(x => typeof x !== "object" || x === null)) {
+                rows.push({ PROPERTY: fullKey, VALUE: v.join(", ") });
+              } else {
+                v.forEach((item, idx) => {
+                  if (item && typeof item === "object" && item.type) {
+                    rows.push({ PROPERTY: `${fullKey}[${idx}]`, VALUE: item.type });
+                  } else if (item && typeof item === "object" && item.name) {
+                    rows.push({ PROPERTY: `${fullKey}.${item.name}`, VALUE: item.version ? `v${item.version}` : JSON.stringify(item) });
+                  } else {
+                    flattenSingle(item, `${fullKey}[${idx}]`);
+                  }
+                });
+              }
+            } else if (typeof v === "number" && (k.endsWith("_bytes") || k.endsWith("_in_bytes"))) {
+              rows.push({ PROPERTY: fullKey.replace(/_in_bytes$/, "").replace(/_bytes$/, ""), VALUE: formatBytes(v) });
+            } else if (typeof v === "number" && (k.endsWith("_millis") || k.endsWith("_in_millis"))) {
+              if (k.includes("time") || k.includes("timestamp")) {
+                rows.push({ PROPERTY: fullKey, VALUE: formatTimestamp(v) });
+              } else {
+                rows.push({ PROPERTY: fullKey, VALUE: `${v}ms` });
+              }
+            } else {
+              rows.push({ PROPERTY: fullKey, VALUE: String(v ?? "-") });
+            }
+          }
+        } else {
+          rows.push({ PROPERTY: prefix || cleanType, VALUE: String(obj ?? "-") });
+        }
+      }
+
+      flattenSingle(infoSection);
+      if (rows.length > 0) return formatRowsToTable(rows, ["PROPERTY", "VALUE"]);
+      return null;
+    } else {
+      // Multiple nodes for non-jvm types
+      const rows = [];
+      for (const nid of nodeIds) {
+        const targetNode = data.nodes[nid];
+        const nodeName = targetNode.name || nid;
+        const infoSection = cleanType && targetNode[cleanType] !== undefined ? targetNode[cleanType] : targetNode;
+
+        function flattenMulti(obj, prefix = "") {
+          if (Array.isArray(obj)) {
+            if (obj.length === 0) {
+              rows.push({ NODE: nodeName, PROPERTY: prefix || cleanType, VALUE: "None" });
+            } else if (obj.every(x => typeof x !== "object" || x === null)) {
+              rows.push({ NODE: nodeName, PROPERTY: prefix || cleanType, VALUE: obj.join(", ") });
+            } else {
+              obj.forEach((item, idx) => {
+                if (item && typeof item === "object") {
+                  const label = item.name ? `${prefix ? `${prefix}.` : ""}${item.name}` : `${prefix ? `${prefix}[${idx}]` : `[${idx}]`}`;
+                  const details = [
+                    item.version ? `v${item.version}` : null,
+                    item.description || null,
+                    item.type || null,
+                  ].filter(Boolean).join(" - ") || JSON.stringify(item);
+                  rows.push({ NODE: nodeName, PROPERTY: label, VALUE: details });
+                } else {
+                  rows.push({ NODE: nodeName, PROPERTY: `${prefix}[${idx}]`, VALUE: String(item ?? "-") });
+                }
+              });
+            }
+            return;
+          }
+
+          if (obj && typeof obj === "object") {
+            for (const [k, v] of Object.entries(obj)) {
+              if (k === "name" || k === "ip" || k === "roles") continue;
+              const fullKey = prefix ? `${prefix}.${k}` : k;
+              if (v && typeof v === "object" && !Array.isArray(v)) {
+                flattenMulti(v, fullKey);
+              } else if (Array.isArray(v)) {
+                if (v.length === 0) {
+                  rows.push({ NODE: nodeName, PROPERTY: fullKey, VALUE: "None" });
+                } else if (v.every(x => typeof x !== "object" || x === null)) {
+                  rows.push({ NODE: nodeName, PROPERTY: fullKey, VALUE: v.join(", ") });
+                } else {
+                  v.forEach((item, idx) => {
+                    if (item && typeof item === "object" && item.type) {
+                      rows.push({ NODE: nodeName, PROPERTY: `${fullKey}[${idx}]`, VALUE: item.type });
+                    } else if (item && typeof item === "object" && item.name) {
+                      rows.push({ NODE: nodeName, PROPERTY: `${fullKey}.${item.name}`, VALUE: item.version ? `v${item.version}` : JSON.stringify(item) });
+                    } else {
+                      flattenMulti(item, `${fullKey}[${idx}]`);
+                    }
+                  });
+                }
+              } else if (typeof v === "number" && (k.endsWith("_bytes") || k.endsWith("_in_bytes"))) {
+                rows.push({ NODE: nodeName, PROPERTY: fullKey.replace(/_in_bytes$/, "").replace(/_bytes$/, ""), VALUE: formatBytes(v) });
+              } else if (typeof v === "number" && (k.endsWith("_millis") || k.endsWith("_in_millis"))) {
+                if (k.includes("time") || k.includes("timestamp")) {
+                  rows.push({ NODE: nodeName, PROPERTY: fullKey, VALUE: formatTimestamp(v) });
+                } else {
+                  rows.push({ NODE: nodeName, PROPERTY: fullKey, VALUE: `${v}ms` });
+                }
+              } else {
+                rows.push({ NODE: nodeName, PROPERTY: fullKey, VALUE: String(v ?? "-") });
+              }
+            }
+          } else {
+            rows.push({ NODE: nodeName, PROPERTY: prefix || cleanType, VALUE: String(obj ?? "-") });
+          }
+        }
+
+        flattenMulti(infoSection);
+      }
+      if (rows.length > 0) return formatRowsToTable(rows, ["NODE", "PROPERTY", "VALUE"]);
+      return null;
     }
   }
 
+  // Fallback for single targetNode object
   const rows = [];
-  if (targetNode.name) rows.push({ key: "Node Name", value: String(targetNode.name) });
-  if (targetNode.ip) rows.push({ key: "IP Address", value: String(targetNode.ip) });
-  if (targetNode.roles) {
-    rows.push({ key: "Roles", value: Array.isArray(targetNode.roles) ? targetNode.roles.join(", ") : String(targetNode.roles) });
-  }
+  if (data.name) rows.push({ PROPERTY: "Node Name", VALUE: String(data.name) });
+  if (data.ip) rows.push({ PROPERTY: "IP Address", VALUE: String(data.ip) });
+  const infoSection = cleanType && data[cleanType] !== undefined ? data[cleanType] : data;
 
-  const cleanType = (infoType || "").toLowerCase().replace(/^_/, "").trim();
-  const infoSection = cleanType && targetNode[cleanType] ? targetNode[cleanType] : targetNode;
-
-  function flattenNodeObj(obj, prefix = "") {
+  function flattenDirect(obj, prefix = "") {
     for (const [k, v] of Object.entries(obj)) {
       if (k === "name" || k === "ip" || k === "roles") continue;
       const fullKey = prefix ? `${prefix}.${k}` : k;
       if (v && typeof v === "object" && !Array.isArray(v)) {
-        flattenNodeObj(v, fullKey);
+        flattenDirect(v, fullKey);
+      } else if (typeof v === "number" && (k.endsWith("_bytes") || k.endsWith("_in_bytes"))) {
+        rows.push({ PROPERTY: fullKey, VALUE: formatBytes(v) });
       } else {
-        rows.push({ key: fullKey, value: Array.isArray(v) ? v.join(", ") : String(v ?? "-") });
+        rows.push({ PROPERTY: fullKey, VALUE: Array.isArray(v) ? v.join(", ") : String(v ?? "-") });
       }
     }
   }
-
-  flattenNodeObj(infoSection);
-
-  if (rows.length > 0) {
-    return formatRowsToTable(rows, ["key", "value"]);
-  }
+  flattenDirect(infoSection);
+  if (rows.length > 0) return formatRowsToTable(rows, ["PROPERTY", "VALUE"]);
   return null;
 }
 
-async function fetchNodeInspect(parsed) {
+function formatNodeStatsTable(data, metricFilter = "") {
+  if (typeof data === "string") return data;
+  if (!data || typeof data !== "object") return null;
+
+  if (data.nodes && typeof data.nodes === "object") {
+    const nodeIds = Object.keys(data.nodes);
+    if (nodeIds.length === 0) return "No node statistics found.";
+
+    // Multi-node comparison table when no specific metric is filtered
+    if (nodeIds.length > 1 && !metricFilter) {
+      const rows = [];
+      for (const nid of nodeIds) {
+        const n = data.nodes[nid];
+        const cpu = n.os?.cpu?.percent ?? n.process?.cpu?.percent ?? "-";
+        const memPercent = n.os?.mem?.used_percent ?? "-";
+        const heapUsedBytes = n.jvm?.mem?.heap_used_in_bytes;
+        const heapMaxBytes = n.jvm?.mem?.heap_max_in_bytes;
+        const heapPercent = n.jvm?.mem?.heap_used_percent ?? (heapUsedBytes && heapMaxBytes ? Math.round((heapUsedBytes / heapMaxBytes) * 100) : "-");
+        const docs = n.indices?.docs?.count !== undefined ? Number(n.indices.docs.count).toLocaleString() : "-";
+        const store = n.indices?.store?.size_in_bytes !== undefined ? formatBytes(n.indices.store.size_in_bytes) : "-";
+        const httpOpen = n.http?.current_open ?? "-";
+
+        rows.push({
+          NODE: n.name || nid,
+          IP: n.ip || n.host || "-",
+          "CPU%": cpu !== "-" ? `${cpu}%` : "-",
+          "RAM%": memPercent !== "-" ? `${memPercent}%` : "-",
+          "HEAP%": heapPercent !== "-" ? `${heapPercent}%` : "-",
+          "HEAP USED": heapUsedBytes !== undefined ? formatBytes(heapUsedBytes) : "-",
+          DOCS: docs,
+          "STORE SIZE": store,
+          "HTTP OPEN": String(httpOpen),
+        });
+      }
+      return formatRowsToTable(rows, ["NODE", "IP", "CPU%", "RAM%", "HEAP%", "HEAP USED", "DOCS", "STORE SIZE", "HTTP OPEN"]);
+    }
+
+    // Single node or detailed metric drilldown -> Key-Value table
+    const targetNode = data.nodes[nodeIds[0]];
+    const rows = [];
+    const nodeName = targetNode.name || nodeIds[0];
+
+    rows.push({ PROPERTY: "Node Name", VALUE: String(nodeName) });
+    if (targetNode.ip) rows.push({ PROPERTY: "IP Address", VALUE: String(targetNode.ip) });
+    if (targetNode.roles) {
+      rows.push({ PROPERTY: "Roles", VALUE: Array.isArray(targetNode.roles) ? targetNode.roles.join(", ") : String(targetNode.roles) });
+    }
+
+    // Specific metric filter drilldown (e.g. metric="jvm")
+    if (metricFilter) {
+      const section = targetNode[metricFilter];
+      if (section && typeof section === "object") {
+        function flattenMetric(obj, prefix = "") {
+          for (const [k, v] of Object.entries(obj)) {
+            const fullKey = prefix ? `${prefix}.${k}` : k;
+            if (v && typeof v === "object" && !Array.isArray(v)) {
+              flattenMetric(v, fullKey);
+            } else if (Array.isArray(v)) {
+              rows.push({ PROPERTY: fullKey, VALUE: v.map(x => typeof x === "object" ? JSON.stringify(x) : String(x)).join(", ") });
+            } else if (typeof v === "number" && (k.endsWith("_bytes") || k.endsWith("_in_bytes"))) {
+              rows.push({ PROPERTY: fullKey.replace(/_in_bytes$/, "").replace(/_bytes$/, ""), VALUE: formatBytes(v) });
+            } else if (typeof v === "number" && (k.endsWith("_millis") || k.endsWith("_in_millis"))) {
+              if (k.includes("time") || k.includes("timestamp")) {
+                rows.push({ PROPERTY: fullKey, VALUE: formatTimestamp(v) });
+              } else {
+                rows.push({ PROPERTY: fullKey, VALUE: `${v}ms` });
+              }
+            } else {
+              rows.push({ PROPERTY: fullKey, VALUE: String(v ?? "-") });
+            }
+          }
+        }
+        flattenMetric(section);
+        return formatRowsToTable(rows, ["PROPERTY", "VALUE"]);
+      }
+    }
+
+    // Default detailed summary
+    // 1. Operating System
+    if (targetNode.os) {
+      if (targetNode.os.cpu?.percent !== undefined) rows.push({ PROPERTY: "OS CPU Usage", VALUE: `${targetNode.os.cpu.percent}%` });
+      if (targetNode.os.cpu?.load_average?.["1m"] !== undefined) rows.push({ PROPERTY: "OS Load Average (1m)", VALUE: String(targetNode.os.cpu.load_average["1m"]) });
+      if (targetNode.os.mem?.used_in_bytes && targetNode.os.mem?.total_in_bytes) {
+        rows.push({
+          PROPERTY: "OS Memory Used",
+          VALUE: `${formatBytes(targetNode.os.mem.used_in_bytes)} / ${formatBytes(targetNode.os.mem.total_in_bytes)} (${targetNode.os.mem.used_percent ?? 0}%)`
+        });
+      }
+      if (targetNode.os.mem?.free_in_bytes !== undefined) rows.push({ PROPERTY: "OS Memory Free", VALUE: formatBytes(targetNode.os.mem.free_in_bytes) });
+    }
+
+    // 2. Process
+    if (targetNode.process) {
+      if (targetNode.process.cpu?.percent !== undefined) rows.push({ PROPERTY: "Process CPU Usage", VALUE: `${targetNode.process.cpu.percent}%` });
+      if (targetNode.process.open_file_descriptors !== undefined && targetNode.process.max_file_descriptors !== undefined) {
+        rows.push({ PROPERTY: "Open File Descriptors", VALUE: `${targetNode.process.open_file_descriptors} / ${targetNode.process.max_file_descriptors}` });
+      }
+    }
+
+    // 3. JVM
+    if (targetNode.jvm) {
+      if (targetNode.jvm.uptime_in_millis) rows.push({ PROPERTY: "JVM Uptime", VALUE: formatDuration(targetNode.jvm.uptime_in_millis) });
+      if (targetNode.jvm.mem?.heap_used_in_bytes && targetNode.jvm.mem?.heap_max_in_bytes) {
+        rows.push({
+          PROPERTY: "JVM Heap Memory",
+          VALUE: `${formatBytes(targetNode.jvm.mem.heap_used_in_bytes)} / ${formatBytes(targetNode.jvm.mem.heap_max_in_bytes)} (${targetNode.jvm.mem.heap_used_percent ?? 0}%)`
+        });
+      }
+      if (targetNode.jvm.mem?.heap_committed_in_bytes !== undefined) rows.push({ PROPERTY: "JVM Heap Committed", VALUE: formatBytes(targetNode.jvm.mem.heap_committed_in_bytes) });
+      if (targetNode.jvm.mem?.non_heap_used_in_bytes !== undefined) rows.push({ PROPERTY: "JVM Non-Heap Used", VALUE: formatBytes(targetNode.jvm.mem.non_heap_used_in_bytes) });
+      if (targetNode.jvm.gc?.collectors?.young) {
+        rows.push({
+          PROPERTY: "JVM GC Young Gen",
+          VALUE: `${Number(targetNode.jvm.gc.collectors.young.collection_count ?? 0).toLocaleString()} collections (${targetNode.jvm.gc.collectors.young.collection_time_in_millis ?? 0}ms)`
+        });
+      }
+      if (targetNode.jvm.gc?.collectors?.old) {
+        rows.push({
+          PROPERTY: "JVM GC Old Gen",
+          VALUE: `${Number(targetNode.jvm.gc.collectors.old.collection_count ?? 0).toLocaleString()} collections (${targetNode.jvm.gc.collectors.old.collection_time_in_millis ?? 0}ms)`
+        });
+      }
+      if (targetNode.jvm.threads) {
+        rows.push({ PROPERTY: "JVM Threads", VALUE: `${targetNode.jvm.threads.count ?? 0} active (Peak: ${targetNode.jvm.threads.peak_count ?? 0})` });
+      }
+    }
+
+    // 4. Indices
+    if (targetNode.indices) {
+      if (targetNode.indices.docs?.count !== undefined) rows.push({ PROPERTY: "Indices Total Docs", VALUE: Number(targetNode.indices.docs.count).toLocaleString() });
+      if (targetNode.indices.docs?.deleted !== undefined) rows.push({ PROPERTY: "Indices Deleted Docs", VALUE: Number(targetNode.indices.docs.deleted).toLocaleString() });
+      if (targetNode.indices.store?.size_in_bytes !== undefined) rows.push({ PROPERTY: "Indices Store Size", VALUE: formatBytes(targetNode.indices.store.size_in_bytes) });
+      if (targetNode.indices.indexing?.index_total !== undefined) rows.push({ PROPERTY: "Indexing Operations Total", VALUE: Number(targetNode.indices.indexing.index_total).toLocaleString() });
+      if (targetNode.indices.search?.query_total !== undefined) rows.push({ PROPERTY: "Search Queries Total", VALUE: Number(targetNode.indices.search.query_total).toLocaleString() });
+      if (targetNode.indices.query_cache) {
+        rows.push({ PROPERTY: "Query Cache Hits / Misses", VALUE: `${Number(targetNode.indices.query_cache.hit_count ?? 0).toLocaleString()} / ${Number(targetNode.indices.query_cache.miss_count ?? 0).toLocaleString()}` });
+      }
+      if (targetNode.indices.fielddata?.memory_size_in_bytes !== undefined) rows.push({ PROPERTY: "Fielddata Memory", VALUE: formatBytes(targetNode.indices.fielddata.memory_size_in_bytes) });
+      if (targetNode.indices.segments?.count !== undefined) rows.push({ PROPERTY: "Lucene Segments Count", VALUE: String(targetNode.indices.segments.count) });
+    }
+
+    // 5. File System
+    if (targetNode.fs?.total) {
+      const fsTotal = targetNode.fs.total.total_in_bytes;
+      const fsAvail = targetNode.fs.total.available_in_bytes;
+      if (fsTotal && fsAvail) {
+        const pctFree = Math.round((fsAvail / fsTotal) * 100);
+        rows.push({ PROPERTY: "Disk Storage (FS)", VALUE: `${formatBytes(fsAvail)} available of ${formatBytes(fsTotal)} (${pctFree}% free)` });
+      }
+    }
+
+    // 6. HTTP & Transport
+    if (targetNode.http) {
+      rows.push({ PROPERTY: "HTTP Current Connections", VALUE: String(targetNode.http.current_open ?? 0) });
+      rows.push({ PROPERTY: "HTTP Total Connections Opened", VALUE: Number(targetNode.http.total_opened ?? 0).toLocaleString() });
+    }
+    if (targetNode.transport) {
+      if (targetNode.transport.rx_count !== undefined) rows.push({ PROPERTY: "Transport Packets Rx / Tx", VALUE: `${Number(targetNode.transport.rx_count).toLocaleString()} / ${Number(targetNode.transport.tx_count ?? 0).toLocaleString()}` });
+      if (targetNode.transport.rx_size_in_bytes !== undefined) rows.push({ PROPERTY: "Transport Data Rx / Tx", VALUE: `${formatBytes(targetNode.transport.rx_size_in_bytes)} / ${formatBytes(targetNode.transport.tx_size_in_bytes ?? 0)}` });
+    }
+
+    return formatRowsToTable(rows, ["PROPERTY", "VALUE"]);
+  }
+
+  return null;
+}
+
+export async function fetchNodeInspect(parsed, defaultInfoType) {
   const startTime = performance.now();
-  const node = parsed.argMap?.node || parsed.argTokens?.[0] || "";
-  const infoType = parsed.argMap?.info_type || parsed.argTokens?.[1] || "";
-  
-  const rawAi = String(parsed.argMap?.ai_summarization ?? parsed.argTokens?.[2] ?? "").toLowerCase().trim();
-  const isAi = rawAi === "true" || rawAi === "1" || rawAi === "yes";
+  const boolTokens = ["true", "false", "yes", "no", "1", "0"];
 
-  const rawJson = String(parsed.argMap?.json ?? parsed.argTokens?.[3] ?? "").toLowerCase().trim();
-  const isJson = rawJson === "true" || rawJson === "1" || rawJson === "yes";
+  let rawNode = parsed.argMap?.node || parsed.argMap?.id_or_name || parsed.argMap?.name || "";
+  let rawInfoType = defaultInfoType || parsed.argMap?.info_type || "";
+  let rawAi = parsed.argMap?.ai_summarization ?? parsed.argMap?.ai_summarizatio ?? parsed.argMap?.ai_summary;
+  let rawJson = parsed.argMap?.json;
 
-  if (!node) {
-    return error("Missing required argument: <node> (name or ID)", 400, 0);
+  // Handle positional tokens if not provided as named args
+  if (!rawNode && parsed.argTokens?.[0]) {
+    const tok0 = String(parsed.argTokens[0]).toLowerCase();
+    if (boolTokens.includes(tok0)) {
+      if (rawJson === undefined) rawJson = tok0;
+    } else {
+      rawNode = parsed.argTokens[0];
+    }
   }
-  if (!infoType) {
-    return error("Missing required argument: <info_type> (e.g. os, process, jvm, thread_pool, transport, http, plugins)", 400, 0);
+
+  if (rawJson === undefined && parsed.argTokens?.[1]) {
+    const tok1 = String(parsed.argTokens[1]).toLowerCase();
+    if (boolTokens.includes(tok1)) {
+      rawJson = tok1;
+    }
   }
 
-  const cleanInfoType = infoType.replace(/^_/, "");
+  if (rawAi === undefined && parsed.argTokens?.[2]) {
+    const tok2 = String(parsed.argTokens[2]).toLowerCase();
+    if (boolTokens.includes(tok2)) {
+      rawAi = tok2;
+    }
+  }
+
+  // Infer info_type from commandName if still not set
+  if (!rawInfoType && parsed.commandName && parsed.commandName.startsWith("node:")) {
+    rawInfoType = parsed.commandName.slice(5);
+  }
+
+  const cleanInfoType = (rawInfoType || "").trim().replace(/^_/, "");
+  const cleanNode = String(rawNode || "").trim();
+
+  const isAi = String(rawAi ?? "").toLowerCase() === "true" || String(rawAi ?? "") === "1" || String(rawAi ?? "").toLowerCase() === "yes";
+  const isJson = String(rawJson ?? "").toLowerCase() === "true" || String(rawJson ?? "") === "1" || String(rawJson ?? "").toLowerCase() === "yes" || String(rawJson ?? "").toLowerCase() === "json";
+
+  if (!cleanInfoType) {
+    return error("Missing required parameter: info_type", 400, 0);
+  }
 
   try {
-    const url = `${API_BASE_URL}/v1/core/inspect_node?id_or_name=${encodeURIComponent(node)}&info_type=${encodeURIComponent(cleanInfoType)}&ai_summarization=${isAi}`;
+    const params = new URLSearchParams();
+    if (cleanNode) {
+      params.append("id_or_name", cleanNode);
+    }
+    params.append("info_type", cleanInfoType);
+    params.append("ai_summarization", String(isAi));
+
+    const url = `${API_BASE_URL}/v1/core/inspect_node?${params.toString()}`;
     const res = await fetch(url, { method: "GET" });
     const durationMs = Math.round(performance.now() - startTime);
 
@@ -1059,6 +1562,105 @@ async function fetchNodeInspect(parsed) {
       return { ...ok(nodeData, "json", durationMs), aiResponse };
     } else {
       const formatted = formatNodeInspectTable(nodeData, cleanInfoType);
+      if (formatted) {
+        return { ...ok(formatted, "table", durationMs), aiResponse };
+      }
+      return { ...ok(nodeData, "json", durationMs), aiResponse };
+    }
+  } catch (err) {
+    const durationMs = Math.round(performance.now() - startTime);
+    return error(
+      `Cannot connect to backend server at ${API_BASE_URL}. Backend is offline or not running (${err.message || "Failed to fetch"}).`,
+      503,
+      durationMs
+    );
+  }
+}
+
+export async function fetchNodeStats(parsed) {
+  const startTime = performance.now();
+  const boolTokens = ["true", "false", "yes", "no", "1", "0"];
+
+  let rawNode = parsed.argMap?.node || parsed.argMap?.id_or_name || parsed.argMap?.name || "";
+  let rawMetric = parsed.argMap?.metric || "";
+  let rawAi = parsed.argMap?.ai_summarization ?? parsed.argMap?.ai_summarizatio ?? parsed.argMap?.ai_summary;
+  let rawJson = parsed.argMap?.json;
+
+  // Positional arguments: node:stats [node] [metric] [json] [ai_summarization]
+  if (!rawNode && parsed.argTokens?.[0]) {
+    const tok0 = String(parsed.argTokens[0]).toLowerCase();
+    if (boolTokens.includes(tok0)) {
+      if (rawJson === undefined) rawJson = tok0;
+    } else {
+      rawNode = parsed.argTokens[0];
+    }
+  }
+
+  if (!rawMetric && parsed.argTokens?.[1]) {
+    const tok1 = String(parsed.argTokens[1]).toLowerCase();
+    if (boolTokens.includes(tok1)) {
+      if (rawJson === undefined) rawJson = tok1;
+    } else {
+      rawMetric = parsed.argTokens[1];
+    }
+  }
+
+  if (rawJson === undefined && parsed.argTokens?.[2]) {
+    const tok2 = String(parsed.argTokens[2]).toLowerCase();
+    if (boolTokens.includes(tok2)) {
+      rawJson = tok2;
+    }
+  }
+
+  if (rawAi === undefined && parsed.argTokens?.[3]) {
+    const tok3 = String(parsed.argTokens[3]).toLowerCase();
+    if (boolTokens.includes(tok3)) {
+      rawAi = tok3;
+    }
+  }
+
+  const cleanNode = String(rawNode || "").trim();
+  const cleanMetric = String(rawMetric || "").trim().toLowerCase();
+  const isAi = String(rawAi ?? "").toLowerCase() === "true" || String(rawAi ?? "") === "1" || String(rawAi ?? "").toLowerCase() === "yes";
+  const isJson = String(rawJson ?? "").toLowerCase() === "true" || String(rawJson ?? "") === "1" || String(rawJson ?? "").toLowerCase() === "yes" || String(rawJson ?? "").toLowerCase() === "json";
+
+  try {
+    const params = new URLSearchParams();
+    if (cleanNode) {
+      params.append("id_or_name", cleanNode);
+    }
+    // Backend inspect_node route handles info_type="stats" by calling ES /_nodes/stats or /_nodes/{id}/stats
+    params.append("info_type", "stats");
+    params.append("ai_summarization", String(isAi));
+
+    const url = `${API_BASE_URL}/v1/core/inspect_node?${params.toString()}`;
+    const res = await fetch(url, { method: "GET" });
+    const durationMs = Math.round(performance.now() - startTime);
+
+    if (!res.ok) {
+      let errMsg = `API request failed with HTTP status ${res.status}`;
+      try {
+        const errJson = await res.json();
+        if (errJson?.detail?.error) errMsg = typeof errJson.detail.error === "string" ? errJson.detail.error : JSON.stringify(errJson.detail.error);
+        else if (errJson?.detail) errMsg = typeof errJson.detail === "string" ? errJson.detail : JSON.stringify(errJson.detail);
+        else if (errJson?.error) errMsg = typeof errJson.error === "string" ? errJson.error : JSON.stringify(errJson.error);
+      } catch {}
+      return error(errMsg, res.status, durationMs);
+    }
+
+    const payload = await res.json();
+    if (payload && payload.success === false) {
+      const errMsg = payload.error || payload.response || "Failed to inspect node statistics";
+      return error(typeof errMsg === "string" ? errMsg : JSON.stringify(errMsg), 400, durationMs);
+    }
+
+    const nodeData = (payload && payload.success && payload.response !== undefined) ? payload.response : payload;
+    const aiResponse = (payload && (payload.ai_response || payload.ai_summary)) ? (payload.ai_response || payload.ai_summary) : null;
+
+    if (isJson) {
+      return { ...ok(nodeData, "json", durationMs), aiResponse };
+    } else {
+      const formatted = formatNodeStatsTable(nodeData, cleanMetric);
       if (formatted) {
         return { ...ok(formatted, "table", durationMs), aiResponse };
       }
@@ -1172,6 +1774,138 @@ export async function fetchIndexDelete(indexName) {
   }
 }
 
+function formatIndexDataTable(data, indexName) {
+  if (typeof data === "string") return data;
+  if (!data || typeof data !== "object") return null;
+
+  const hits = data?.hits?.hits;
+  if (!Array.isArray(hits)) {
+    if (Array.isArray(data) && data.length > 0) {
+      return formatRowsToTable(data, Object.keys(data[0] || {}));
+    }
+    return null;
+  }
+
+  if (hits.length === 0) {
+    const total = typeof data?.hits?.total === "object" ? data.hits.total.value : (data?.hits?.total ?? 0);
+    return `No documents found in index '${indexName}' (total hits: ${total}).`;
+  }
+
+  const fieldSet = new Set();
+  for (const hit of hits) {
+    if (hit._source && typeof hit._source === "object") {
+      for (const k of Object.keys(hit._source)) {
+        fieldSet.add(k);
+      }
+    }
+  }
+
+  const sourceFields = Array.from(fieldSet);
+  const cols = ["_id", ...sourceFields];
+
+  const rows = hits.map(hit => {
+    const row = { _id: hit._id || "-" };
+    const src = hit._source || {};
+    for (const f of sourceFields) {
+      const val = src[f];
+      if (val === undefined || val === null) {
+        row[f] = "-";
+      } else if (typeof val === "object") {
+        row[f] = JSON.stringify(val);
+      } else {
+        row[f] = String(val);
+      }
+    }
+    return row;
+  });
+
+  return formatRowsToTable(rows, cols);
+}
+
+export async function fetchIndexData(parsed) {
+  const startTime = performance.now();
+  const rawIndexName = parsed.argMap?.index || parsed.argMap?.index_name || parsed.argTokens?.[0] || "";
+  const cleanIndexName = String(rawIndexName).trim().replace(/^\/+/, "");
+
+  if (!cleanIndexName) {
+    return error("Missing required argument: <index>", 400, 0);
+  }
+
+  // Parse size parameter (default: "100")
+  let size = "100";
+  const rawSize = parsed.argMap?.size !== undefined ? String(parsed.argMap.size).trim() : "";
+  if (rawSize && !isNaN(Number(rawSize)) && Number(rawSize) > 0) {
+    size = String(parseInt(rawSize, 10));
+  } else if (parsed.argTokens?.[1] && !isNaN(Number(parsed.argTokens[1])) && Number(parsed.argTokens[1]) > 0) {
+    size = String(parseInt(parsed.argTokens[1], 10));
+  }
+
+  // Parse json flag
+  const rawJsonArg = String(parsed.argMap?.json ?? "").toLowerCase().trim();
+  let isJson = rawJsonArg === "true" || rawJsonArg === "1" || rawJsonArg === "yes";
+  if (!isJson) {
+    for (const token of (parsed.argTokens || [])) {
+      const t = String(token).toLowerCase().trim();
+      if (t === "json" || t === "json=true" || (t === "true" && token !== parsed.argTokens[0] && isNaN(Number(token)))) {
+        isJson = true;
+        break;
+      }
+    }
+  }
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/v1/crud/index_data_inspect`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        index_name: cleanIndexName,
+        size: String(size),
+      }),
+    });
+
+    const durationMs = Math.round(performance.now() - startTime);
+
+    if (!res.ok) {
+      let errMsg = `Failed to inspect index data with HTTP ${res.status}`;
+      try {
+        const errJson = await res.json();
+        if (errJson?.detail?.error) errMsg = typeof errJson.detail.error === "string" ? errJson.detail.error : JSON.stringify(errJson.detail.error);
+        else if (errJson?.detail) errMsg = typeof errJson.detail === "string" ? errJson.detail : JSON.stringify(errJson.detail);
+        else if (errJson?.error) errMsg = typeof errJson.error === "string" ? errJson.error : JSON.stringify(errJson.error);
+      } catch {}
+      return error(errMsg, res.status, durationMs);
+    }
+
+    const payload = await res.json();
+    if (payload && payload.success === false) {
+      const errMsg = payload.error || payload.response || `Failed to inspect index data for '${cleanIndexName}'`;
+      return error(typeof errMsg === "string" ? errMsg : JSON.stringify(errMsg), 400, durationMs);
+    }
+
+    const data = (payload && payload.response !== undefined) ? payload.response : payload;
+
+    if (isJson) {
+      return ok(data, "json", durationMs);
+    } else {
+      const formatted = formatIndexDataTable(data, cleanIndexName);
+      if (typeof formatted === "string") {
+        if (Array.isArray(data?.hits?.hits) && data.hits.hits.length === 0) {
+          return ok(formatted, "text", durationMs);
+        }
+        return ok(formatted, "table", durationMs);
+      }
+      return ok(data, "json", durationMs);
+    }
+  } catch (err) {
+    const durationMs = Math.round(performance.now() - startTime);
+    return error(
+      `Cannot connect to backend server at ${API_BASE_URL}. (${err.message || "Failed to inspect index data"})`,
+      503,
+      durationMs
+    );
+  }
+}
+
 let lastBackendCheck = 0;
 let lastBackendStatus = false;
 
@@ -1222,8 +1956,38 @@ export async function executeCommand(parsed) {
       case "node:list":
         return fetchNodesList(parsed);
 
-      case "node:inspect":
-        return fetchNodeInspect(parsed);
+      case "node:settings":
+        return fetchNodeInspect(parsed, "settings");
+
+      case "node:os":
+        return fetchNodeInspect(parsed, "os");
+
+      case "node:process":
+        return fetchNodeInspect(parsed, "process");
+
+      case "node:jvm":
+        return fetchNodeInspect(parsed, "jvm");
+
+      case "node:plugins":
+        return fetchNodeInspect(parsed, "plugins");
+
+      case "node:http":
+        return fetchNodeInspect(parsed, "http");
+
+      case "node:ingest":
+        return fetchNodeInspect(parsed, "ingest");
+
+      case "node:remote_cluster_server":
+        return fetchNodeInspect(parsed, "remote_cluster_server");
+
+      case "node:usage":
+        return fetchNodeInspect(parsed, "usage");
+
+      case "node:transport":
+        return fetchNodeInspect(parsed, "transport");
+
+      case "node:stats":
+        return fetchNodeStats(parsed);
 
       case "allocation:list":
       case "node:allocation":
@@ -1235,9 +1999,33 @@ export async function executeCommand(parsed) {
       case "index:list":
         return fetchIndexList(parsed);
 
-      case "index:inspect":
+      case "index:get":
+      case "index:data":
+      case "index:data_inspect":
+      case "index:data-inspect":
+        return fetchIndexData(parsed);
+
+      case "index:stats":
+      case "index:stat":
+        return fetchIndexInspect(parsed, "stats");
+
+      case "index:mappings":
+      case "index:mapping":
+        return fetchIndexInspect(parsed, "mapping");
+
+      case "index:settings":
+      case "index:setting":
+        return fetchIndexInspect(parsed, "settings");
+
+      case "index:aliases":
+      case "index:alias":
+        return fetchIndexInspect(parsed, "_alias");
+
+      case "index:count":
+        return fetchIndexInspect(parsed, "count");
+
       case "index:search":
-        return fetchIndexInspect(parsed);
+        return fetchIndexInspect(parsed, parsed.argMap?.info_type || parsed.argTokens?.[1] || "");
 
       case "index:create": {
         const indexName = parsed.argMap.index_name || parsed.argMap.index || parsed.argTokens[0];
@@ -1249,6 +2037,86 @@ export async function executeCommand(parsed) {
       case "index:delete": {
         const indexName = parsed.argMap.index || parsed.argTokens[0];
         return fetchIndexDelete(indexName);
+      }
+
+      case "document:get":
+      case "document:inspect":
+      case "doc:get":
+      case "doc:inspect": {
+        const indexName = (parsed.argMap?.index || parsed.argTokens?.[0] || "").replace(/^index=/, "");
+        const docId = (parsed.argMap?.id || parsed.argMap?.doc_id || parsed.argTokens?.[1] || "").replace(/^id=/, "");
+        if (!indexName) return error("Missing required argument: <index>", 400, 0);
+        if (!docId) return error("Missing required argument: <id>", 400, 0);
+        const isJson = String(parsed.argMap?.json || "").toLowerCase() === "true";
+        return await fetchDocumentGet(indexName, docId, isJson);
+      }
+
+      case "document:insert":
+      case "doc:insert": {
+        const indexName = (parsed.argMap?.index || parsed.argTokens?.[0] || "").replace(/^index=/, "");
+        const docId = (parsed.argMap?.id || parsed.argTokens?.[1] || "").replace(/^id=/, "");
+        if (!indexName) return error("Missing required argument: <index>", 400, 0);
+        return await fetchDocumentInsert(indexName, docId, {});
+      }
+
+      case "document:update":
+      case "doc:update": {
+        const indexName = (parsed.argMap?.index || parsed.argTokens?.[0] || "").replace(/^index=/, "");
+        const docId = (parsed.argMap?.id || parsed.argTokens?.[1] || "").replace(/^id=/, "");
+        if (!indexName) return error("Missing required argument: <index>", 400, 0);
+        if (!docId) return error("Missing required argument: <id>", 400, 0);
+        return await fetchDocumentUpdate(indexName, docId, {});
+      }
+
+      case "document:delete":
+      case "doc:delete": {
+        const indexName = (parsed.argMap?.index || parsed.argTokens?.[0] || "").replace(/^index=/, "");
+        const docId = (parsed.argMap?.id || parsed.argTokens?.[1] || "").replace(/^id=/, "");
+        if (!indexName) return error("Missing required argument: <index>", 400, 0);
+        if (!docId) return error("Missing required argument: <id>", 400, 0);
+        return await fetchDocumentDelete(indexName, docId);
+      }
+
+      case "bulk:insert":
+      case "document:bulk-insert":
+      case "document:bulk_insert":
+      case "document:bulk:insert": {
+        const indexName = (parsed.argMap?.index || parsed.argTokens?.[0] || "").replace(/^index=/, "");
+        const fileArg = parsed.argMap?.file || parsed.argMap?.data || parsed.argTokens?.[1] || "";
+        if (!indexName) return error("Missing required argument: <index>", 400, 0);
+        if (!fileArg) {
+          return error("Missing required argument: <file>. Please select or specify a .json file. Usage: bulk:insert <index> <file.json> [json=false]", 400, 0);
+        }
+        const isJson = String(parsed.argMap?.json || "").toLowerCase() === "true";
+        return await fetchBulkInsert(indexName, fileArg, isJson);
+      }
+
+      case "bulk:update":
+      case "document:bulk-update":
+      case "document:bulk_update":
+      case "document:bulk:update": {
+        const indexName = (parsed.argMap?.index || parsed.argTokens?.[0] || "").replace(/^index=/, "");
+        const fileArg = parsed.argMap?.file || parsed.argMap?.data || parsed.argTokens?.[1] || "";
+        if (!indexName) return error("Missing required argument: <index>", 400, 0);
+        if (!fileArg) {
+          return error("Missing required argument: <file>. Please select or specify a .json file. Usage: bulk:update <index> <file.json> [json=false]", 400, 0);
+        }
+        const isJson = String(parsed.argMap?.json || "").toLowerCase() === "true";
+        return await fetchBulkUpdate(indexName, fileArg, isJson);
+      }
+
+      case "bulk:delete":
+      case "document:bulk-delete":
+      case "document:bulk_delete":
+      case "document:bulk:delete": {
+        const indexName = (parsed.argMap?.index || parsed.argTokens?.[0] || "").replace(/^index=/, "");
+        const fileArg = parsed.argMap?.file || parsed.argMap?.ids || parsed.argTokens?.[1] || "";
+        if (!indexName) return error("Missing required argument: <index>", 400, 0);
+        if (!fileArg) {
+          return error("Missing required argument: <file>. Please select or specify a .json file. Usage: bulk:delete <index> <file.json> [json=false]", 400, 0);
+        }
+        const isJson = String(parsed.argMap?.json || "").toLowerCase() === "true";
+        return await fetchBulkDelete(indexName, fileArg, isJson);
       }
 
       default: {
@@ -1279,50 +2147,11 @@ export async function executeCommand(parsed) {
       case "cluster:pending-tasks":
         return ok({ tasks: [] }, "json", latency);
 
-      case "index:get":
-        return ok(mockIndexInfo(args.index || "unknown"), "json", latency);
-
-      case "index:mappings":
-        return ok({
-          [args.index]: {
-            mappings: {
-              properties: {
-                id: { type: "long" },
-                name: { type: "text", fields: { keyword: { type: "keyword" } } },
-                created_at: { type: "date" },
-                status: { type: "keyword" },
-              },
-            },
-          },
-        }, "json", latency);
-
-      case "index:settings":
-        return ok(mockIndexInfo(args.index).settings, "json", latency);
-
-      case "index:stats":
-        return ok({
-          _shards: { total: 2, successful: 2, failed: 0 },
-          _all: {
-            primaries: { docs: { count: 12453, deleted: 0 }, store: { size_in_bytes: 8601600 } },
-          },
-          indices: { [args.index]: { primaries: { docs: { count: 12453 } } } },
-        }, "json", latency);
-
       case "index:refresh":
         return ok({ _shards: { total: 2, successful: 2, failed: 0 } }, "json", latency);
 
       case "index:flush":
-        return ok({ _shards: { total: 2, successful: 2, failed: 0 } }, "json", latency);
-
-      case "node:stats":
-        return ok({
-          _nodes: { total: 3, successful: 3, failed: 0 },
-          nodes: {
-            "node-1-id": { name: "node-primary-01", jvm: { heap_used_percent: 42 }, os: { cpu: { percent: 4 } } },
-            "node-2-id": { name: "node-data-02", jvm: { heap_used_percent: 38 }, os: { cpu: { percent: 2 } } },
-            "node-3-id": { name: "node-data-03", jvm: { heap_used_percent: 45 }, os: { cpu: { percent: 5 } } },
-          },
-        }, "json", latency);
+        return fetchIndexInspect(parsed, "_flush");
 
       case "node:info":
         return ok({
