@@ -24,7 +24,7 @@ class Client:
         self.verify_certs = None if isinstance(configuration, tuple) else configuration.get(
             "elasticease_web").get("elasticsearch").get("verify_certs")
 
-    def get(self, endpoint: str = ".") -> dict:
+    def get(self, endpoint: str) -> dict:
         """Make GET request to elastic API
         """
         try:
