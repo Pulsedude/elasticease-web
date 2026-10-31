@@ -192,11 +192,46 @@ def inspect_existing_document(index_name: str, doc_id: str):
 
 @router.post("/update_doc", status_code=status.HTTP_200_OK, description="Update the contents or fields of an existing document by its document ID in a specified index")
 def update_existing_document(body: UpdateDocument):
-    """Inspect the any such existing document (single data) of any such existing index
+    """Update the any such single specific single document in the index
     """
     try:
         response = crudops.update_doc(
             body.index_name, body.document_id, body.document)
+
+        if "error" in response:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"error": response.get("error")},
+            )
+
+        elif response.get("response") == "failed to authorize":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={"error": response.get("response")},
+            )
+
+        elif response.get("success") is False:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"error": response.get("response")},
+            )
+
+        return response
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": str(e)})
+
+
+@router.delete("/delete_doc", status_code=status.HTTP_200_OK, description="Delete any such specific existing single document from the index")
+def delete_existing_document(index_name: str, document_id: str):
+    """Delete the any such existing document permanently from the index
+    """
+    try:
+        response = crudops.delete_doc(index_name, document_id)
 
         if "error" in response:
             raise HTTPException(
