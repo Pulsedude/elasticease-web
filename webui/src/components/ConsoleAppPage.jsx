@@ -21,6 +21,17 @@ import { createHistoryManager } from "../console/historyManager.js";
 import { executeCommand, fetchIndexCreate, fetchIndexDelete } from "../console/mockExecutor.js";
 import { getCommand } from "../console/commandRegistry.js";
 import { buildMappingDocument } from "../console/mappingBuilder.js";
+import {
+  parseDocumentFields,
+  parseBulkDocuments,
+  fetchDocumentGet,
+  fetchDocumentInsert,
+  fetchDocumentUpdate,
+  fetchDocumentDelete,
+  fetchBulkInsert,
+  fetchBulkUpdate,
+  fetchBulkDelete,
+} from "../console/documentBuilder.js";
 
 // Persistent across re-renders
 const historyManager = createHistoryManager();
@@ -165,9 +176,16 @@ export default function ConsoleAppPage({ theme }) {
 
   const handleCancelPrompt = useCallback(() => {
     if (pendingPrompt) {
-      const msg = pendingPrompt.type === "confirm_delete"
-        ? `Index deletion cancelled for index '${pendingPrompt.indexName}'. No data was deleted.`
-        : `Index creation cancelled for index '${pendingPrompt.indexName}'.`;
+      let msg = "";
+      if (pendingPrompt.type === "confirm_delete") {
+        msg = `Index deletion cancelled for index '${pendingPrompt.indexName}'. No data was deleted.`;
+      } else if (pendingPrompt.type === "input_document_insert") {
+        msg = `Document insertion cancelled for index '${pendingPrompt.indexName}'.`;
+      } else if (pendingPrompt.type === "input_document_update") {
+        msg = `Document update cancelled for document '${pendingPrompt.documentId}' in index '${pendingPrompt.indexName}'.`;
+      } else {
+        msg = `Index creation cancelled for index '${pendingPrompt.indexName}'.`;
+      }
       setHistoryEntries(prev => [...prev, {
         id: nextEntryId++,
         command: "cancel",
@@ -293,6 +311,275 @@ export default function ConsoleAppPage({ theme }) {
         }
         return;
       }
+
+      if (prompt.type === "input_document_insert") {
+        const lower = inputStr.toLowerCase();
+        if (lower === "cancel" || lower === "abort" || lower === "exit") {
+          setHistoryEntries(prev => [...prev, {
+            id: nextEntryId++,
+            command: inputStr,
+            result: {
+              status: "ok",
+              statusCode: 200,
+              durationMs: 0,
+              format: "text",
+              data: `Document insertion cancelled for index '${prompt.indexName}'.`,
+            },
+          }]);
+          setPendingPrompt(null);
+          setTimeout(() => inputRef.current?.focus(), 0);
+          return;
+        }
+
+        const parseResult = parseDocumentFields(inputStr);
+        if (!parseResult.valid) {
+          setHistoryEntries(prev => [...prev, {
+            id: nextEntryId++,
+            command: inputStr,
+            result: {
+              status: "error",
+              statusCode: 400,
+              durationMs: 0,
+              format: "text",
+              data: `Invalid document fields: ${parseResult.error}\n\nPlease enter fields as key=value pairs (e.g. name=john, age=12) or valid JSON, or type 'cancel' to abort.`,
+            },
+          }]);
+          setTimeout(() => inputRef.current?.focus(), 0);
+          return;
+        }
+
+        setLoadingCommand(`Inserting document into index '${prompt.indexName}'...`);
+        try {
+          const res = await fetchDocumentInsert(prompt.indexName, prompt.documentId, parseResult.doc);
+          setHistoryEntries(prev => [...prev, {
+            id: nextEntryId++,
+            command: `payload: ${inputStr}`,
+            result: res,
+          }]);
+        } catch (err) {
+          setHistoryEntries(prev => [...prev, {
+            id: nextEntryId++,
+            command: `payload: ${inputStr}`,
+            result: {
+              status: "error",
+              statusCode: 500,
+              durationMs: 0,
+              format: "json",
+              data: { error: { reason: err.message || "Failed to insert document", status: 500 } },
+            },
+          }]);
+        } finally {
+          setLoadingCommand(null);
+          setPendingPrompt(null);
+          setTimeout(() => inputRef.current?.focus(), 0);
+        }
+        return;
+      }
+
+      if (prompt.type === "input_document_update") {
+        const lower = inputStr.toLowerCase();
+        if (lower === "cancel" || lower === "abort" || lower === "exit") {
+          setHistoryEntries(prev => [...prev, {
+            id: nextEntryId++,
+            command: inputStr,
+            result: {
+              status: "ok",
+              statusCode: 200,
+              durationMs: 0,
+              format: "text",
+              data: `Document update cancelled for document '${prompt.documentId}' in index '${prompt.indexName}'.`,
+            },
+          }]);
+          setPendingPrompt(null);
+          setTimeout(() => inputRef.current?.focus(), 0);
+          return;
+        }
+
+        const parseResult = parseDocumentFields(inputStr);
+        if (!parseResult.valid) {
+          setHistoryEntries(prev => [...prev, {
+            id: nextEntryId++,
+            command: inputStr,
+            result: {
+              status: "error",
+              statusCode: 400,
+              durationMs: 0,
+              format: "text",
+              data: `Invalid document fields: ${parseResult.error}\n\nPlease enter fields as key=value pairs (e.g. name=john, age=12) or valid JSON, or type 'cancel' to abort.`,
+            },
+          }]);
+          setTimeout(() => inputRef.current?.focus(), 0);
+          return;
+        }
+
+        setLoadingCommand(`Updating document '${prompt.documentId}' in index '${prompt.indexName}'...`);
+        try {
+          const res = await fetchDocumentUpdate(prompt.indexName, prompt.documentId, parseResult.doc);
+          setHistoryEntries(prev => [...prev, {
+            id: nextEntryId++,
+            command: `payload: ${inputStr}`,
+            result: res,
+          }]);
+        } catch (err) {
+          setHistoryEntries(prev => [...prev, {
+            id: nextEntryId++,
+            command: `payload: ${inputStr}`,
+            result: {
+              status: "error",
+              statusCode: 500,
+              durationMs: 0,
+              format: "json",
+              data: { error: { reason: err.message || "Failed to update document", status: 500 } },
+            },
+          }]);
+        } finally {
+          setLoadingCommand(null);
+          setPendingPrompt(null);
+          setTimeout(() => inputRef.current?.focus(), 0);
+        }
+        return;
+      }
+
+      if (prompt.type === "input_bulk_insert") {
+        const lower = inputStr.toLowerCase();
+        if (lower === "cancel" || lower === "abort" || lower === "exit") {
+          setHistoryEntries(prev => [...prev, {
+            id: nextEntryId++,
+            command: inputStr,
+            result: {
+              status: "ok",
+              statusCode: 200,
+              durationMs: 0,
+              format: "text",
+              data: `Bulk insert cancelled for index '${prompt.indexName}'.`,
+            },
+          }]);
+          setPendingPrompt(null);
+          setTimeout(() => inputRef.current?.focus(), 0);
+          return;
+        }
+
+        setLoadingCommand(`Bulk inserting documents into index '${prompt.indexName}'...`);
+        try {
+          const res = await fetchBulkInsert(prompt.indexName, inputStr, false);
+          setHistoryEntries(prev => [...prev, {
+            id: nextEntryId++,
+            command: `bulk:insert ${prompt.indexName} ${inputStr}`,
+            result: res,
+          }]);
+        } catch (err) {
+          setHistoryEntries(prev => [...prev, {
+            id: nextEntryId++,
+            command: `bulk:insert ${prompt.indexName} ${inputStr}`,
+            result: {
+              status: "error",
+              statusCode: 500,
+              durationMs: 0,
+              format: "json",
+              data: { error: { reason: err.message || "Failed to bulk insert documents", status: 500 } },
+            },
+          }]);
+        } finally {
+          setLoadingCommand(null);
+          setPendingPrompt(null);
+          setTimeout(() => inputRef.current?.focus(), 0);
+        }
+        return;
+      }
+
+      if (prompt.type === "input_bulk_update") {
+        const lower = inputStr.toLowerCase();
+        if (lower === "cancel" || lower === "abort" || lower === "exit") {
+          setHistoryEntries(prev => [...prev, {
+            id: nextEntryId++,
+            command: inputStr,
+            result: {
+              status: "ok",
+              statusCode: 200,
+              durationMs: 0,
+              format: "text",
+              data: `Bulk update cancelled for index '${prompt.indexName}'.`,
+            },
+          }]);
+          setPendingPrompt(null);
+          setTimeout(() => inputRef.current?.focus(), 0);
+          return;
+        }
+
+        setLoadingCommand(`Bulk updating documents in index '${prompt.indexName}'...`);
+        try {
+          const res = await fetchBulkUpdate(prompt.indexName, inputStr, false);
+          setHistoryEntries(prev => [...prev, {
+            id: nextEntryId++,
+            command: `bulk:update ${prompt.indexName} ${inputStr}`,
+            result: res,
+          }]);
+        } catch (err) {
+          setHistoryEntries(prev => [...prev, {
+            id: nextEntryId++,
+            command: `bulk:update ${prompt.indexName} ${inputStr}`,
+            result: {
+              status: "error",
+              statusCode: 500,
+              durationMs: 0,
+              format: "json",
+              data: { error: { reason: err.message || "Failed to bulk update documents", status: 500 } },
+            },
+          }]);
+        } finally {
+          setLoadingCommand(null);
+          setPendingPrompt(null);
+          setTimeout(() => inputRef.current?.focus(), 0);
+        }
+        return;
+      }
+
+      if (prompt.type === "input_bulk_delete") {
+        const lower = inputStr.toLowerCase();
+        if (lower === "cancel" || lower === "abort" || lower === "exit") {
+          setHistoryEntries(prev => [...prev, {
+            id: nextEntryId++,
+            command: inputStr,
+            result: {
+              status: "ok",
+              statusCode: 200,
+              durationMs: 0,
+              format: "text",
+              data: `Bulk delete cancelled for index '${prompt.indexName}'.`,
+            },
+          }]);
+          setPendingPrompt(null);
+          setTimeout(() => inputRef.current?.focus(), 0);
+          return;
+        }
+
+        setLoadingCommand(`Bulk deleting documents from index '${prompt.indexName}'...`);
+        try {
+          const res = await fetchBulkDelete(prompt.indexName, inputStr, false);
+          setHistoryEntries(prev => [...prev, {
+            id: nextEntryId++,
+            command: `bulk:delete ${prompt.indexName} ${inputStr}`,
+            result: res,
+          }]);
+        } catch (err) {
+          setHistoryEntries(prev => [...prev, {
+            id: nextEntryId++,
+            command: `bulk:delete ${prompt.indexName} ${inputStr}`,
+            result: {
+              status: "error",
+              statusCode: 500,
+              durationMs: 0,
+              format: "json",
+              data: { error: { reason: err.message || "Failed to bulk delete documents", status: 500 } },
+            },
+          }]);
+        } finally {
+          setLoadingCommand(null);
+          setPendingPrompt(null);
+          setTimeout(() => inputRef.current?.focus(), 0);
+        }
+        return;
+      }
     }
 
     // If a suggestion is highlighted, select it
@@ -359,6 +646,255 @@ export default function ConsoleAppPage({ theme }) {
         setTimeout(() => inputRef.current?.focus(), 0);
         return;
       }
+    }
+
+    if (parsed.commandName === "document:get" || parsed.commandName === "doc:get" || parsed.commandName === "document:inspect" || parsed.commandName === "doc:inspect") {
+      const indexName = (parsed.argMap.index || parsed.argTokens[0] || "").replace(/^index=/, "");
+      const documentId = (parsed.argMap.id || parsed.argMap.doc_id || parsed.argTokens[1] || "").replace(/^id=/, "");
+      if (!indexName || !documentId) {
+        setValidationError("Both index name and document ID are required. Usage: document:get <index> <id> [json=false]");
+        return;
+      }
+      setShowSuggestions(false);
+      setValidationError(null);
+      setLoadingCommand(`Fetching document '${documentId}' from index '${indexName}'...`);
+      historyManager.push(trimmed);
+
+      try {
+        const isJson = String(parsed.argMap?.json || "").toLowerCase() === "true";
+        const res = await fetchDocumentGet(indexName, documentId, isJson);
+        setHistoryEntries(prev => [...prev, { id: nextEntryId++, command: trimmed, result: res }]);
+      } catch (err) {
+        setHistoryEntries(prev => [...prev, {
+          id: nextEntryId++,
+          command: trimmed,
+          result: {
+            status: "error",
+            statusCode: 500,
+            durationMs: 0,
+            format: "json",
+            data: { error: { reason: err.message || "Failed to fetch document", status: 500 } },
+          },
+        }]);
+      } finally {
+        setLoadingCommand(null);
+        setInputValue("");
+        setActiveArgIndex(-1);
+        setSuggestionActiveIndex(-1);
+        setShowSuggestions(true);
+        setTimeout(() => inputRef.current?.focus(), 0);
+      }
+      return;
+    }
+
+    if (parsed.commandName === "document:insert") {
+      const indexName = (parsed.argMap.index || parsed.argTokens[0] || "").replace(/^index=/, "");
+      const documentId = (parsed.argMap.id || parsed.argTokens[1] || "").replace(/^id=/, "");
+      if (!indexName) {
+        setValidationError("Index name is required to insert a document. Usage: document:insert <index> [id]");
+        return;
+      }
+      historyManager.push(trimmed);
+      setHistoryEntries(prev => [...prev, {
+        id: nextEntryId++,
+        command: trimmed,
+        result: {
+          status: "ok",
+          statusCode: 200,
+          durationMs: 0,
+          format: "text",
+          data: `📝 Ready to insert document into index '${indexName}'${documentId ? ` (ID: '${documentId}')` : ""}.\nPlease enter document fields and their values below.\nExample: name=john, age=12, email=john@example.com\n(Or paste a JSON object, or type 'cancel' to abort)`,
+        },
+      }]);
+      setPendingPrompt({ type: "input_document_insert", indexName, documentId });
+      setInputValue("");
+      setActiveArgIndex(-1);
+      setTimeout(() => inputRef.current?.focus(), 0);
+      return;
+    }
+
+    if (parsed.commandName === "document:update") {
+      const indexName = (parsed.argMap.index || parsed.argTokens[0] || "").replace(/^index=/, "");
+      const documentId = (parsed.argMap.id || parsed.argTokens[1] || "").replace(/^id=/, "");
+      if (!indexName || !documentId) {
+        setValidationError("Both index name and document ID are required. Usage: document:update <index> <id>");
+        return;
+      }
+      historyManager.push(trimmed);
+      setHistoryEntries(prev => [...prev, {
+        id: nextEntryId++,
+        command: trimmed,
+        result: {
+          status: "ok",
+          statusCode: 200,
+          durationMs: 0,
+          format: "text",
+          data: `📝 Ready to update document '${documentId}' in index '${indexName}'.\nPlease enter the updated fields and their values below.\nExample: name=john, age=12, status=active\n(Or paste a JSON object, or type 'cancel' to abort)`,
+        },
+      }]);
+      setPendingPrompt({ type: "input_document_update", indexName, documentId });
+      setInputValue("");
+      setActiveArgIndex(-1);
+      setTimeout(() => inputRef.current?.focus(), 0);
+      return;
+    }
+
+    if (parsed.commandName === "document:delete") {
+      const indexName = (parsed.argMap.index || parsed.argTokens[0] || "").replace(/^index=/, "");
+      const documentId = (parsed.argMap.id || parsed.argTokens[1] || "").replace(/^id=/, "");
+      if (!indexName || !documentId) {
+        setValidationError("Both index name and document ID are required. Usage: document:delete <index> <id>");
+        return;
+      }
+      setShowSuggestions(false);
+      setValidationError(null);
+      setLoadingCommand(`Deleting document '${documentId}' from index '${indexName}'...`);
+      historyManager.push(trimmed);
+
+      try {
+        const res = await fetchDocumentDelete(indexName, documentId);
+        setHistoryEntries(prev => [...prev, { id: nextEntryId++, command: trimmed, result: res }]);
+      } catch (err) {
+        setHistoryEntries(prev => [...prev, {
+          id: nextEntryId++,
+          command: trimmed,
+          result: {
+            status: "error",
+            statusCode: 500,
+            durationMs: 0,
+            format: "json",
+            data: { error: { reason: err.message || "Failed to delete document", status: 500 } },
+          },
+        }]);
+      } finally {
+        setLoadingCommand(null);
+        setInputValue("");
+        setActiveArgIndex(-1);
+        setSuggestionActiveIndex(-1);
+        setShowSuggestions(true);
+        setTimeout(() => inputRef.current?.focus(), 0);
+      }
+      return;
+    }
+
+    if (parsed.commandName === "bulk:insert" || parsed.commandName === "document:bulk-insert" || parsed.commandName === "document:bulk_insert") {
+      const indexName = (parsed.argMap.index || parsed.argTokens[0] || "").replace(/^index=/, "");
+      const fileArg = parsed.argMap.file || parsed.argMap.data || parsed.argTokens[1] || "";
+      if (!indexName) {
+        setValidationError("Index name is required for bulk insert. Usage: bulk:insert <index> <file.json>");
+        return;
+      }
+      if (!fileArg) {
+        setValidationError("Please select or specify a .json file for bulk insert. (Click 'Browse' on the <file> chip)");
+        return;
+      }
+
+      setShowSuggestions(false);
+      setValidationError(null);
+      setLoadingCommand(`Bulk inserting documents into index '${indexName}' from '${fileArg}'...`);
+      historyManager.push(trimmed);
+      try {
+        const isJson = String(parsed.argMap.json || "").toLowerCase() === "true";
+        const res = await fetchBulkInsert(indexName, fileArg, isJson);
+        setHistoryEntries(prev => [...prev, { id: nextEntryId++, command: trimmed, result: res }]);
+      } catch (err) {
+        setHistoryEntries(prev => [...prev, {
+          id: nextEntryId++,
+          command: trimmed,
+          result: {
+            status: "error", statusCode: 500, durationMs: 0, format: "json",
+            data: { error: { reason: err.message || "Failed to bulk insert", status: 500 } },
+          },
+        }]);
+      } finally {
+        setLoadingCommand(null);
+        setInputValue("");
+        setActiveArgIndex(-1);
+        setSuggestionActiveIndex(-1);
+        setShowSuggestions(true);
+        setTimeout(() => inputRef.current?.focus(), 0);
+      }
+      return;
+    }
+
+    if (parsed.commandName === "bulk:update" || parsed.commandName === "document:bulk-update" || parsed.commandName === "document:bulk_update") {
+      const indexName = (parsed.argMap.index || parsed.argTokens[0] || "").replace(/^index=/, "");
+      const fileArg = parsed.argMap.file || parsed.argMap.data || parsed.argTokens[1] || "";
+      if (!indexName) {
+        setValidationError("Index name is required for bulk update. Usage: bulk:update <index> <file.json>");
+        return;
+      }
+      if (!fileArg) {
+        setValidationError("Please select or specify a .json file for bulk update. (Click 'Browse' on the <file> chip)");
+        return;
+      }
+
+      setShowSuggestions(false);
+      setValidationError(null);
+      setLoadingCommand(`Bulk updating documents in index '${indexName}' from '${fileArg}'...`);
+      historyManager.push(trimmed);
+      try {
+        const isJson = String(parsed.argMap.json || "").toLowerCase() === "true";
+        const res = await fetchBulkUpdate(indexName, fileArg, isJson);
+        setHistoryEntries(prev => [...prev, { id: nextEntryId++, command: trimmed, result: res }]);
+      } catch (err) {
+        setHistoryEntries(prev => [...prev, {
+          id: nextEntryId++,
+          command: trimmed,
+          result: {
+            status: "error", statusCode: 500, durationMs: 0, format: "json",
+            data: { error: { reason: err.message || "Failed to bulk update", status: 500 } },
+          },
+        }]);
+      } finally {
+        setLoadingCommand(null);
+        setInputValue("");
+        setActiveArgIndex(-1);
+        setSuggestionActiveIndex(-1);
+        setShowSuggestions(true);
+        setTimeout(() => inputRef.current?.focus(), 0);
+      }
+      return;
+    }
+
+    if (parsed.commandName === "bulk:delete" || parsed.commandName === "document:bulk-delete" || parsed.commandName === "document:bulk_delete") {
+      const indexName = (parsed.argMap.index || parsed.argTokens[0] || "").replace(/^index=/, "");
+      const fileArg = parsed.argMap.file || parsed.argMap.ids || parsed.argTokens[1] || "";
+      if (!indexName) {
+        setValidationError("Index name is required for bulk delete. Usage: bulk:delete <index> <file.json>");
+        return;
+      }
+      if (!fileArg) {
+        setValidationError("Please select or specify a .json file for bulk delete. (Click 'Browse' on the <file> chip)");
+        return;
+      }
+
+      setShowSuggestions(false);
+      setValidationError(null);
+      setLoadingCommand(`Bulk deleting documents from index '${indexName}' from '${fileArg}'...`);
+      historyManager.push(trimmed);
+      try {
+        const isJson = String(parsed.argMap.json || "").toLowerCase() === "true";
+        const res = await fetchBulkDelete(indexName, fileArg, isJson);
+        setHistoryEntries(prev => [...prev, { id: nextEntryId++, command: trimmed, result: res }]);
+      } catch (err) {
+        setHistoryEntries(prev => [...prev, {
+          id: nextEntryId++,
+          command: trimmed,
+          result: {
+            status: "error", statusCode: 500, durationMs: 0, format: "json",
+            data: { error: { reason: err.message || "Failed to bulk delete", status: 500 } },
+          },
+        }]);
+      } finally {
+        setLoadingCommand(null);
+        setInputValue("");
+        setActiveArgIndex(-1);
+        setSuggestionActiveIndex(-1);
+        setShowSuggestions(true);
+        setTimeout(() => inputRef.current?.focus(), 0);
+      }
+      return;
     }
 
     // Execute standard command
@@ -497,17 +1033,27 @@ export default function ConsoleAppPage({ theme }) {
         />
       )}
 
-      {/* ── Interactive Prompt Banner (for confirm_delete or input_mapping) ── */}
+      {/* ── Interactive Prompt Banner (for confirm_delete, input_mapping, input_document_insert, input_document_update) ── */}
       {pendingPrompt && (
         <div className="mx-4 mb-2 p-3 rounded-lg border flex items-center justify-between text-xs font-mono shadow-sm bg-[rgba(99,102,241,0.08)] border-[rgba(99,102,241,0.25)] text-[#c7d2fe]">
           <div className="flex items-center gap-2">
             <span className="text-[#818cf8] font-semibold">
-              {pendingPrompt.type === "confirm_delete" ? "⚠️ Delete Confirmation:" : "📋 Schema Mapping:"}
+              {pendingPrompt.type === "confirm_delete"
+                ? "⚠️ Delete Confirmation:"
+                : pendingPrompt.type === "input_mapping"
+                ? "📋 Schema Mapping:"
+                : pendingPrompt.type === "input_document_insert"
+                ? "📝 Document Insert:"
+                : "📝 Document Update:"}
             </span>
             <span>
               {pendingPrompt.type === "confirm_delete"
                 ? `Delete index '${pendingPrompt.indexName}'? Type 'yes' or click Confirm.`
-                : `Enter field definitions for '${pendingPrompt.indexName}' (e.g. name=text, age=integer) below.`}
+                : pendingPrompt.type === "input_mapping"
+                ? `Enter field definitions for '${pendingPrompt.indexName}' (e.g. name=text, age=integer) below.`
+                : pendingPrompt.type === "input_document_insert"
+                ? `Enter fields and values for index '${pendingPrompt.indexName}'${pendingPrompt.documentId ? ` (ID: '${pendingPrompt.documentId}')` : ""} (e.g. name=john, age=12) below.`
+                : `Enter fields to update for doc '${pendingPrompt.documentId}' in index '${pendingPrompt.indexName}' (e.g. name=john, age=12) below.`}
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -550,6 +1096,10 @@ export default function ConsoleAppPage({ theme }) {
             ? "Type 'yes' to confirm or 'no' to cancel..."
             : pendingPrompt?.type === "input_mapping"
             ? "Enter fields (e.g. name=text, age=integer) or 'cancel'..."
+            : pendingPrompt?.type === "input_document_insert"
+            ? "Enter fields (e.g. name=john, age=12) or 'cancel'..."
+            : pendingPrompt?.type === "input_document_update"
+            ? "Enter update fields (e.g. name=john, age=12) or 'cancel'..."
             : "Type a command…"
         }
       />

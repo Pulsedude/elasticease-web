@@ -69,8 +69,16 @@ export function getCommandSuggestions(input) {
   const query = input.trim().toLowerCase();
   if (!query) return [];
 
-  const matched = COMMAND_REGISTRY.filter(cmd => fuzzyMatch(cmd.name, query))
-    .sort((a, b) => matchScore(a.name, query) - matchScore(b.name, query))
+  const matched = COMMAND_REGISTRY.filter(cmd => {
+    if (fuzzyMatch(cmd.name, query)) return true;
+    if (cmd.aliases && cmd.aliases.some(a => fuzzyMatch(a, query))) return true;
+    return false;
+  })
+    .sort((a, b) => {
+      const scoreA = Math.min(matchScore(a.name, query), ...(a.aliases ? a.aliases.map(al => matchScore(al, query)) : [99]));
+      const scoreB = Math.min(matchScore(b.name, query), ...(b.aliases ? b.aliases.map(al => matchScore(al, query)) : [99]));
+      return scoreA - scoreB;
+    })
     .slice(0, 12);
 
   return matched.map(cmd => ({
@@ -130,12 +138,12 @@ export function getArgumentSuggestions(commandName, argName, argType, partialInp
     candidates = MOCK_INDICES;
   } else if (argType === "node") {
     candidates = MOCK_NODES;
+  } else if (argName === "size") {
+    candidates = ["10", "25", "50", "100", "250", "500"];
+  } else if (argName === "metric") {
+    candidates = ["jvm", "os", "process", "indices", "fs", "http", "transport", "thread_pool"];
   } else if (argName === "info_type") {
-    if (commandName === "node:inspect") {
-      candidates = ["os", "process", "jvm", "thread_pool", "transport", "http", "plugins", "ingest", "indices"];
-    } else {
-      candidates = ["mapping", "settings", "stats", "aliases"];
-    }
+    candidates = ["mapping", "settings", "stats", "aliases", "count"];
   } else if (argType === "enum") {
     // Handled by caller who has the options array
     return [];

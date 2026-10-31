@@ -80,11 +80,30 @@ export function parseInput(raw) {
   // Build named arg map from positional tokens + definition
   const argMap = {};
   if (definition) {
-    definition.arguments.forEach((argDef, i) => {
-      if (argTokens[i] !== undefined) {
-        argMap[argDef.name] = argTokens[i];
+    const positionalTokens = [];
+    const definedNames = new Set(definition.arguments.map(a => a.name.toLowerCase()));
+
+    for (const token of argTokens) {
+      const eqIdx = token.indexOf("=");
+      if (eqIdx > 0) {
+        const potentialKey = token.slice(0, eqIdx).toLowerCase();
+        const potentialVal = token.slice(eqIdx + 1);
+        if (definedNames.has(potentialKey)) {
+          const matchedDef = definition.arguments.find(a => a.name.toLowerCase() === potentialKey);
+          argMap[matchedDef.name] = potentialVal;
+          continue;
+        }
       }
-    });
+      positionalTokens.push(token);
+    }
+
+    let posIdx = 0;
+    for (const argDef of definition.arguments) {
+      if (argMap[argDef.name] === undefined && posIdx < positionalTokens.length) {
+        argMap[argDef.name] = positionalTokens[posIdx];
+        posIdx++;
+      }
+    }
   }
 
   return {
