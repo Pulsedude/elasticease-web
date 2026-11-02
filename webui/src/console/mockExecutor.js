@@ -30,6 +30,7 @@ import {
   fetchBulkUpdate,
   fetchBulkDelete,
 } from "./documentBuilder.js";
+import { API_BASE_URL, apiFetch } from "../api/client.js";
 
 // Fake network latency range
 const LATENCY_MIN = 8;
@@ -160,10 +161,6 @@ function mockSearchResult(index, query) {
 
 // ─── Main executor ─────────────────────────────────────────
 
-const API_BASE_URL = typeof __API_BASE_URL__ !== "undefined"
-  ? __API_BASE_URL__
-  : (typeof __BACKEND_BASE_URL__ !== "undefined" ? __BACKEND_BASE_URL__ : "http://localhost:8000");
-
 function formatClusterHealthTable(data) {
   const rows = [
     ["Cluster Name", data.cluster_name ?? "unknown"],
@@ -194,7 +191,7 @@ async function fetchClusterHealth(parsed) {
   const isJson = rawArg === "true" || rawArg === "1";
 
   try {
-    const res = await fetch(`${API_BASE_URL}/v1/core/cluster_status`);
+    const res = await apiFetch(`${API_BASE_URL}/v1/core/cluster_status`);
     const durationMs = Math.round(performance.now() - startTime);
 
     if (!res.ok) {
@@ -284,7 +281,7 @@ async function fetchShardsList(parsed) {
   const isAi = rawAiArg === "true" || rawAiArg === "1" || rawAiArg === "yes";
 
   try {
-    const res = await fetch(`${API_BASE_URL}/v1/core/shards?unassigned=${isUnassigned}&ai_summarization=${isAi}`);
+    const res = await apiFetch(`${API_BASE_URL}/v1/core/shards?unassigned=${isUnassigned}&ai_summarization=${isAi}`);
     const durationMs = Math.round(performance.now() - startTime);
 
     if (!res.ok) {
@@ -359,7 +356,7 @@ async function fetchIndexList(parsed) {
   const isAi = rawAiArg === "true" || rawAiArg === "1" || rawAiArg === "yes";
 
   try {
-    const res = await fetch(`${API_BASE_URL}/v1/core/indices?ai_response=${isAi}`);
+    const res = await apiFetch(`${API_BASE_URL}/v1/core/indices?ai_response=${isAi}`);
     const durationMs = Math.round(performance.now() - startTime);
 
     if (!res.ok) {
@@ -445,7 +442,7 @@ async function fetchNodesList(parsed) {
   const isAi = rawAiArg === "true" || rawAiArg === "1" || rawAiArg === "yes";
 
   try {
-    const res = await fetch(`${API_BASE_URL}/v1/core/nodes?ai_response=${isAi}`);
+    const res = await apiFetch(`${API_BASE_URL}/v1/core/nodes?ai_response=${isAi}`);
     const durationMs = Math.round(performance.now() - startTime);
 
     if (!res.ok) {
@@ -901,7 +898,7 @@ export async function fetchIndexInspect(parsed, info_type) {
   const cleanIndexName = indexName.trim().replace(/^\/+/, "");
 
   try {
-    const res = await fetch(`${API_BASE_URL}/v1/core/index_inspect`, {
+    const res = await apiFetch(`${API_BASE_URL}/v1/core/index_inspect`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -968,7 +965,7 @@ async function fetchAllocation(parsed) {
   const isAi = rawAi === "true" || rawAi === "1" || rawAi === "yes";
 
   try {
-    const res = await fetch(`${API_BASE_URL}/v1/core/allocation?ai_summarization=${isAi}`, {
+    const res = await apiFetch(`${API_BASE_URL}/v1/core/allocation?ai_summarization=${isAi}`, {
       method: "POST",
     });
     const durationMs = Math.round(performance.now() - startTime);
@@ -1535,7 +1532,7 @@ export async function fetchNodeInspect(parsed, defaultInfoType) {
     params.append("ai_summarization", String(isAi));
 
     const url = `${API_BASE_URL}/v1/core/inspect_node?${params.toString()}`;
-    const res = await fetch(url, { method: "GET" });
+    const res = await apiFetch(url, { method: "GET" });
     const durationMs = Math.round(performance.now() - startTime);
 
     if (!res.ok) {
@@ -1634,7 +1631,7 @@ export async function fetchNodeStats(parsed) {
     params.append("ai_summarization", String(isAi));
 
     const url = `${API_BASE_URL}/v1/core/inspect_node?${params.toString()}`;
-    const res = await fetch(url, { method: "GET" });
+    const res = await apiFetch(url, { method: "GET" });
     const durationMs = Math.round(performance.now() - startTime);
 
     if (!res.ok) {
@@ -1687,7 +1684,7 @@ export async function fetchIndexCreate(indexName, withMapping = false, mapping =
   const targetName = `/${cleanName}`;
 
   try {
-    const res = await fetch(`${API_BASE_URL}/v1/crud/create_index`, {
+    const res = await apiFetch(`${API_BASE_URL}/v1/crud/create_index`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1739,7 +1736,7 @@ export async function fetchIndexDelete(indexName) {
   const targetName = `/${cleanName}`;
 
   try {
-    const res = await fetch(`${API_BASE_URL}/v1/crud/delete_index?name=${encodeURIComponent(targetName)}`, {
+    const res = await apiFetch(`${API_BASE_URL}/v1/crud/delete_index?name=${encodeURIComponent(targetName)}`, {
       method: "DELETE",
     });
 
@@ -1854,7 +1851,7 @@ export async function fetchIndexData(parsed) {
   }
 
   try {
-    const res = await fetch(`${API_BASE_URL}/v1/crud/index_data_inspect`, {
+    const res = await apiFetch(`${API_BASE_URL}/v1/crud/index_data_inspect`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1920,7 +1917,7 @@ async function checkBackendOnline() {
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 2000);
-    const res = await fetch(`${API_BASE_URL}/v1/core/latency`, {
+    const res = await apiFetch(`${API_BASE_URL}/v1/core/latency`, {
       method: "GET",
       signal: controller.signal,
     });

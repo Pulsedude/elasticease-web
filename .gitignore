@@ -1,6 +1,9 @@
 # snippets test files & folders
 test/
 
+# log 
+/log/api.log
+
 # configuration
 config.yaml
 
@@ -62,8 +65,7 @@ cover/
 *.mo
 *.pot
 
-# Django stuff:
-*.log
+# Django stuff:g
 local_settings.py
 db.sqlite3
 db.sqlite3-journal

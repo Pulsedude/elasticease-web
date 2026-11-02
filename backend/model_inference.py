@@ -33,7 +33,7 @@ class Ollama:
             }
             
             response = requests.post(
-                url=self.base_url + "/api/chat" if not self.base_url.endswith("/") else self.base_url + "api/chat",
+                url=self.base_url.strip("/") + "/api/chat",
                 timeout=100,
                 json=data
             )

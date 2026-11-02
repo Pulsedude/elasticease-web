@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import SidebarDrawer from "./components/SidebarDrawer";
@@ -9,10 +9,7 @@ import ClusterHealthPage from "./components/ClusterHealthPage";
 import SettingsPage from "./components/SettingsPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import NotFoundPage from "./components/NotFoundPage";
-
-const API_BASE_URL = typeof __API_BASE_URL__ !== "undefined"
-  ? __API_BASE_URL__
-  : (typeof __BACKEND_BASE_URL__ !== "undefined" ? __BACKEND_BASE_URL__ : "http://localhost:8000");
+import { API_BASE_URL, createEventSource } from "./api/client.js";
 
 const AUTH_USER_KEY  = "elasticease_session_user";
 const AUTH_BOOT_KEY  = "elasticease_frontend_boot_id";
@@ -65,7 +62,7 @@ function AppContent() {
     let eventSource = null;
 
     try {
-      eventSource = new EventSource(`${API_BASE_URL}/v1/core/cluster_info`);
+      eventSource = createEventSource(`${API_BASE_URL}/v1/core/cluster_info`);
       eventSource.onmessage = (event) => {
         if (!active) return;
         try {

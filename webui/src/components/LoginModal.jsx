@@ -8,11 +8,7 @@ import {
   EyeOffIcon,
   ChevronRightIcon,
 } from "./Icons";
-
-// Backend API Base URL from Vite config (config.yaml)
-const API_BASE_URL = typeof __API_BASE_URL__ !== "undefined"
-  ? __API_BASE_URL__
-  : (typeof __BACKEND_BASE_URL__ !== "undefined" ? __BACKEND_BASE_URL__ : "http://localhost:8000");
+import { API_BASE_URL, apiFetch } from "../api/client.js";
 
 /**
  * Safely extracts human-readable error messages and technical details from API error payloads.
@@ -160,7 +156,17 @@ function formatAuthErrorMessage(status, data) {
     return "Elasticsearch configuration error: please verify your base URL and connection settings in config.yaml.";
   }
 
-  // 4. Access forbidden / insufficient permissions (HTTP 403 or security_exception with unauthorized action)
+  // 4. API Key Authentication Error (HTTP 403 with Invalid API Key)
+  if (
+    searchCorpus.includes("invalid api key") ||
+    searchCorpus.includes("api key") ||
+    data?.detail === "Invalid API Key" ||
+    data?.detail === "Not authenticated"
+  ) {
+    return "Invalid or missing backend API key. Please verify the BACKEND_API_KEY set in your .env file.";
+  }
+
+  // 5. Access forbidden / insufficient permissions (HTTP 403 or security_exception with unauthorized action)
   if (
     status === 403 ||
     raw?.status === 403 ||
@@ -241,7 +247,7 @@ export default function LoginModal({ onLoginSuccess }) {
       console.log("Sending credentials:", { username: trimmedUsername, password: "***" });
       
       // Call backend auth API with POST and credentials
-      const response = await fetch(`${API_BASE_URL}/v1/core/auth`, {
+      const response = await apiFetch(`${API_BASE_URL}/v1/core/auth`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

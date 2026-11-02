@@ -20,9 +20,7 @@
  * - quoted strings -> strip outer quotes
  */
 
-const API_BASE_URL = typeof __API_BASE_URL__ !== "undefined"
-  ? __API_BASE_URL__
-  : (typeof __BACKEND_BASE_URL__ !== "undefined" ? __BACKEND_BASE_URL__ : "http://localhost:8000");
+import { API_BASE_URL, apiFetch } from "../api/client.js";
 
 function ok(data, format = "json", durationMs = 0) {
   return { status: "ok", statusCode: 200, durationMs, format, data };
@@ -156,7 +154,7 @@ export async function fetchDocumentGet(indexName, documentId, isJson = false) {
   }
 
   try {
-    const res = await fetch(
+    const res = await apiFetch(
       `${API_BASE_URL}/v1/crud/doc_inspect?index_name=${encodeURIComponent(cleanIndex)}&doc_id=${encodeURIComponent(cleanDocId)}`
     );
 
@@ -205,7 +203,7 @@ export async function fetchDocumentInsert(indexName, documentId = "", documentDa
   const cleanDocId = String(documentId || "").trim();
 
   try {
-    const res = await fetch(`${API_BASE_URL}/v1/crud/insert_doc`, {
+    const res = await apiFetch(`${API_BASE_URL}/v1/crud/insert_doc`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -268,7 +266,7 @@ export async function fetchDocumentUpdate(indexName, documentId, documentData = 
     : { doc: documentData || {} };
 
   try {
-    const res = await fetch(`${API_BASE_URL}/v1/crud/update_doc`, {
+    const res = await apiFetch(`${API_BASE_URL}/v1/crud/update_doc`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -326,7 +324,7 @@ export async function fetchDocumentDelete(indexName, documentId) {
   }
 
   try {
-    const res = await fetch(
+    const res = await apiFetch(
       `${API_BASE_URL}/v1/crud/delete_doc?index_name=${encodeURIComponent(cleanIndex)}&document_id=${encodeURIComponent(cleanDocId)}`,
       { method: "DELETE" }
     );
@@ -510,7 +508,7 @@ export async function resolveUploadFile(fileOrPath, defaultName = "data.json") {
     try {
       const cleanPath = trimmed.replace(/\\/g, "/");
       const url = cleanPath.startsWith("/") || cleanPath.startsWith("http") ? cleanPath : `/${cleanPath}`;
-      const res = await fetch(url);
+      const res = await apiFetch(url);
       if (res.ok) {
         const text = await res.text();
         const fileName = cleanPath.split("/").pop() || defaultName;
@@ -522,7 +520,7 @@ export async function resolveUploadFile(fileOrPath, defaultName = "data.json") {
     try {
       const cleanPath = trimmed.replace(/\\/g, "/").replace(/^\/+/, "");
       const fileName = cleanPath.split("/").pop() || defaultName;
-      const res = await fetch(`${API_BASE_URL}/${cleanPath}`);
+      const res = await apiFetch(`${API_BASE_URL}/${cleanPath}`);
       if (res.ok) {
         const text = await res.text();
         return new File([text], fileName, { type: "application/json" });
@@ -562,7 +560,7 @@ export async function fetchBulkInsert(indexName, fileOrDocs, isJson = false) {
     const fileName = file.name || "bulk_insert.json";
     formData.append("file", file, fileName);
 
-    const res = await fetch(`${API_BASE_URL}/v1/crud/bulk_insert?index_name=${encodeURIComponent(cleanIndex)}`, {
+    const res = await apiFetch(`${API_BASE_URL}/v1/crud/bulk_insert?index_name=${encodeURIComponent(cleanIndex)}`, {
       method: "POST",
       body: formData,
     });
@@ -633,7 +631,7 @@ export async function fetchBulkUpdate(indexName, fileOrDocs, isJson = false) {
     const fileName = file.name || "bulk_update.json";
     formData.append("file", file, fileName);
 
-    const res = await fetch(`${API_BASE_URL}/v1/crud/bulk_update?index_name=${encodeURIComponent(cleanIndex)}`, {
+    const res = await apiFetch(`${API_BASE_URL}/v1/crud/bulk_update?index_name=${encodeURIComponent(cleanIndex)}`, {
       method: "POST",
       body: formData,
     });
@@ -704,7 +702,7 @@ export async function fetchBulkDelete(indexName, fileOrDocs, isJson = false) {
     const fileName = file.name || "bulk_delete.json";
     formData.append("file", file, fileName);
 
-    const res = await fetch(`${API_BASE_URL}/v1/crud/bulk_delete?index_name=${encodeURIComponent(cleanIndex)}`, {
+    const res = await apiFetch(`${API_BASE_URL}/v1/crud/bulk_delete?index_name=${encodeURIComponent(cleanIndex)}`, {
       method: "POST",
       body: formData,
     });
