@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 import logging
@@ -6,7 +6,7 @@ import config
 import time
 import psutil
 from pathlib import Path
-
+from security import verify_api_key
 
 # routers
 from routers import core_operations_routers
@@ -17,7 +17,8 @@ app = FastAPI(
     version="0.1.0",
     docs_url="/docs",
     redoc_url="/redoc",
-    openapi_url="/openapi"
+    openapi_url="/openapi",
+    dependencies=[Depends(verify_api_key)]
 )
 
 # logger
@@ -67,4 +68,6 @@ def redirection_to_openapi_documentation():
 
 # core operation routers (endpoints) ---------------------
 app.include_router(core_operations_routers.router)
+
+# crud operation routers (endpoints) ---------------------
 app.include_router(crud_operations_routers.router)

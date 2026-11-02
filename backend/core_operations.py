@@ -81,32 +81,6 @@ class CoreOps:
         except Exception as e:
             return (False, str(e))
 
-    def ping_of_elastic_api(self):
-        """Return the latency of elasticsearch API
-        """
-        try:
-            start = time.perf_counter()
-
-            # response from elasticsearch API
-            res = self.client.get()
-
-            end = time.perf_counter()
-
-            if res.get("success") is False:
-                return res
-
-            return {
-                "success": True,
-                "status": "alive",
-                "response": round((end - start) * 1000, 2)
-            }
-
-        except Exception as e:
-            return {
-                "success": False,
-                "error": str(e)
-            }
-
     def authenticate(self, username: str, password: str):
         """Check authorization By making request to base url of elasticsearch
         """

@@ -25,42 +25,6 @@ async def cluster_info():
 
 # Other traditional REST Endpoints ------------------------
 
-
-@router.get("/latency", status_code=status.HTTP_200_OK, description="Measure and return round-trip network response latency (in milliseconds) to the Elasticsearch API")
-def see_latency_of_api():
-    """Return the latency of Elasticsearch API
-    """
-    try:
-        response = coreops.ping_of_elastic_api()
-
-        if "error" in response:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"error": response.get("error")},
-            )
-
-        elif response.get("response") == "failed to authorize":
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail={"error": response.get("response")},
-            )
-
-        elif response.get("success") is False:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"error": response.get("response")},
-            )
-
-        return response
-
-    except HTTPException:
-        raise
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"error": str(e)})
-
-
 @router.post("/auth", status_code=status.HTTP_200_OK, description="Authenticate user login credentials against configuration and verify connectivity to the Elasticsearch cluster")
 def authentication(credentials: LoginCredentials):
     """
