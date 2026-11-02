@@ -5,6 +5,8 @@ declare const __BACKEND_HOST__: string;
 declare const __BACKEND_PORT__: string;
 declare const __BACKEND_BASE_URL__: string;
 declare const __API_BASE_URL__: string;
+declare const __BACKEND_API_KEY__: string;
+declare const __API_KEY__: string;
 declare const __FRONTEND_BOOT_ID__: string;
 declare const __ES_BASE_URL__: string;
 declare const __SELECTED_AI_INFERENCE__: string;

@@ -5,11 +5,9 @@ import {
   ShieldIcon, ServerIcon, ActivityIcon, ChevronRightIcon,
   SparklesIcon, CheckIcon, CpuIcon
 } from "./Icons";
+import { API_BASE_URL, apiFetch } from "../api/client.js";
 
 // Configs from config.yaml (injected by vite.config.js)
-const API_BASE_URL = typeof __API_BASE_URL__ !== "undefined"
-  ? __API_BASE_URL__
-  : (typeof __BACKEND_BASE_URL__ !== "undefined" ? __BACKEND_BASE_URL__ : "http://localhost:8000");
 const ES_BASE_URL = typeof __ES_BASE_URL__ !== "undefined" ? __ES_BASE_URL__ : "http://localhost:9200";
 const DEFAULT_AI_INFERENCE = typeof __SELECTED_AI_INFERENCE__ !== "undefined" ? __SELECTED_AI_INFERENCE__ : "ollama";
 const OLLAMA_MODEL = typeof __OLLAMA_MODEL__ !== "undefined" ? __OLLAMA_MODEL__ : "gpt-oss:120b-cloud";
@@ -78,7 +76,7 @@ export default function Navbar({ user, onLogout, theme, toggleTheme, onOpenDrawe
     setSelectedAi(provider);
     localStorage.setItem("elasticease_selected_ai_inference", provider);
     try {
-      await fetch(`${API_BASE_URL}/v1/core/ai_inference`, {
+      await apiFetch(`${API_BASE_URL}/v1/core/ai_inference`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ provider }),
@@ -91,7 +89,7 @@ export default function Navbar({ user, onLogout, theme, toggleTheme, onOpenDrawe
   useEffect(() => {
     async function fetchAiConfig() {
       try {
-        const res = await fetch(`${API_BASE_URL}/v1/core/ai_config`);
+        const res = await apiFetch(`${API_BASE_URL}/v1/core/ai_config`);
         if (res.ok) {
           const j = await res.json();
           if (j?.success && j?.selected_ai_inference) {
@@ -155,7 +153,7 @@ export default function Navbar({ user, onLogout, theme, toggleTheme, onOpenDrawe
             type="button"
             title="Open navigation menu"
             aria-label="Open navigation menu"
-            className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-colors ${isDark ? "border-[#1e2130] hover:bg-[#1e2130] text-slate-400 hover:text-slate-100" : "border-slate-200 hover:bg-slate-100 text-slate-500 hover:text-slate-900"}`}
+            className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-colors cursor-pointer bg-transparent ${isDark ? "border-[#1e2130] hover:bg-[#1e2130] text-slate-400 hover:text-slate-100" : "border-slate-200 hover:bg-slate-100 text-slate-500 hover:text-slate-900"}`}
           >
             <MenuIcon className="w-4 h-4" />
           </button>
@@ -180,7 +178,7 @@ export default function Navbar({ user, onLogout, theme, toggleTheme, onOpenDrawe
             type="button"
             title={isDark ? "Switch to light mode" : "Switch to dark mode"}
             aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
-            className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-colors ${isDark ? "border-[#1e2130] hover:bg-[#1e2130] text-slate-400 hover:text-slate-100" : "border-slate-200 hover:bg-slate-100 text-slate-500 hover:text-slate-900"}`}
+            className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-colors cursor-pointer bg-transparent ${isDark ? "border-[#1e2130] hover:bg-[#1e2130] text-slate-400 hover:text-slate-100" : "border-slate-200 hover:bg-slate-100 text-slate-500 hover:text-slate-900"}`}
           >
             {isDark ? <SunIcon className="w-4 h-4 text-amber-400" /> : <MoonIcon className="w-4 h-4 text-indigo-500" />}
           </button>

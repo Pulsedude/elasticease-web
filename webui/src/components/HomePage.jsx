@@ -5,11 +5,7 @@ import {
 } from "./Icons";
 import ConsoleTerminal from "./ConsoleTerminal";
 import BackButton from "./BackButton";
-
-// Backend API Base URL from Vite config (config.yaml)
-const API_BASE_URL = typeof __API_BASE_URL__ !== "undefined"
-  ? __API_BASE_URL__
-  : (typeof __BACKEND_BASE_URL__ !== "undefined" ? __BACKEND_BASE_URL__ : "http://localhost:8000");
+import { API_BASE_URL, createEventSource } from "../api/client.js";
 
 function Sparkline({ data, color }) {
   const max = Math.max(...data), min = Math.min(...data);
@@ -126,7 +122,7 @@ export default function HomePage({ onNavigateToTab, theme }) {
     let eventSource = null;
 
     try {
-      eventSource = new EventSource(`${API_BASE_URL}/v1/core/cluster_info`);
+      eventSource = createEventSource(`${API_BASE_URL}/v1/core/cluster_info`);
 
       eventSource.onmessage = (event) => {
         if (!isMounted) return;
@@ -575,7 +571,7 @@ export default function HomePage({ onNavigateToTab, theme }) {
           </div>
           <button
             onClick={() => onNavigateToTab("console")} type="button"
-            className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium border transition-colors cursor-pointer ${
+            className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium border transition-colors cursor-pointer bg-transparent ${
               isDark ? "border-[#1e2130] text-slate-400 hover:bg-[#1e2130] hover:text-slate-200" : "border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
             }`}
           >

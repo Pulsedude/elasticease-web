@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { SettingsIcon, CheckIcon, ServerIcon } from "./Icons";
 import BackButton from "./BackButton";
+import { API_BASE_URL, apiFetch } from "../api/client.js";
 
 // Configs from config.yaml (injected by vite.config.js)
-const API_BASE_URL = typeof __API_BASE_URL__ !== "undefined"
-  ? __API_BASE_URL__
-  : (typeof __BACKEND_BASE_URL__ !== "undefined" ? __BACKEND_BASE_URL__ : "http://localhost:8000");
 const ES_BASE_URL = typeof __ES_BASE_URL__ !== "undefined" ? __ES_BASE_URL__ : "http://localhost:9200";
 
 export default function SettingsPage({ theme }) {
@@ -21,7 +19,7 @@ export default function SettingsPage({ theme }) {
     let isMounted = true;
     async function loadActiveConfig() {
       try {
-        const res = await fetch(`${API_BASE_URL}/v1/core/config`);
+        const res = await apiFetch(`${API_BASE_URL}/v1/core/config`);
         if (res.ok) {
           const data = await res.json();
           if (isMounted && data?.success) {
@@ -65,7 +63,7 @@ export default function SettingsPage({ theme }) {
 
     try {
       // 1. Update Backend URL in config.yaml
-      const backendRes = await fetch(`${API_BASE_URL}/v1/core/update_backend_url`, {
+      const backendRes = await apiFetch(`${API_BASE_URL}/v1/core/update_backend_url`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -80,7 +78,7 @@ export default function SettingsPage({ theme }) {
       }
 
       // 2. Update Elasticsearch URL in config.yaml
-      const esRes = await fetch(`${API_BASE_URL}/v1/core/update_elastic_url`, {
+      const esRes = await apiFetch(`${API_BASE_URL}/v1/core/update_elastic_url`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

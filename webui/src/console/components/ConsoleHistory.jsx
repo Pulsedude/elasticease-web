@@ -3,6 +3,7 @@ import { highlightJSON, highlightTable, formatResultData } from "../resultRender
 import ConsoleTable from "./ConsoleTable.jsx";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { API_BASE_URL, apiFetch } from "../../api/client.js";
 /**
  * CommandResult — renders a single history entry (command + result).
  */
@@ -77,14 +78,10 @@ export function CommandResult({ entry, isLatest }) {
   const handleRetroactiveAi = async () => {
     setFetchingAi(true);
     try {
-      const API_BASE_URL = typeof __API_BASE_URL__ !== "undefined"
-        ? __API_BASE_URL__
-        : (typeof __BACKEND_BASE_URL__ !== "undefined" ? __BACKEND_BASE_URL__ : "http://localhost:8000");
-
       const dataStr = typeof entry.result.data === 'string' ? entry.result.data : JSON.stringify(entry.result.data);
       const promptStr = `${dataStr}\n\nHere is the data on my elasticsearch node now please start explaining the data in details in simple order to say that please summarize this given data. Start directly from explaining and NO EXTRA ANSWER.`;
 
-      const res = await fetch(`${API_BASE_URL}/v1/core/ai_summarization`, {
+      const res = await apiFetch(`${API_BASE_URL}/v1/core/ai_summarization`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: promptStr }),

@@ -1,11 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { ServerIcon, ActivityIcon, ShieldIcon, DatabaseIcon, CpuIcon } from "./Icons";
 import BackButton from "./BackButton";
-
-// Backend API Base URL from Vite config (config.yaml)
-const API_BASE_URL = typeof __API_BASE_URL__ !== "undefined"
-  ? __API_BASE_URL__
-  : (typeof __BACKEND_BASE_URL__ !== "undefined" ? __BACKEND_BASE_URL__ : "http://localhost:8000");
+import { API_BASE_URL, createEventSource } from "../api/client.js";
 
 function formatBytes(bytes) {
   if (bytes === null || bytes === undefined || isNaN(bytes)) return "--";
@@ -53,7 +49,7 @@ export default function ClusterHealthPage({ theme }) {
     let eventSource = null;
 
     try {
-      eventSource = new EventSource(`${API_BASE_URL}/v1/core/cluster_info`);
+      eventSource = createEventSource(`${API_BASE_URL}/v1/core/cluster_info`);
 
       eventSource.onmessage = (event) => {
         if (!isMounted) return;
