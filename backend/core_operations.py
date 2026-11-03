@@ -141,11 +141,11 @@ class CoreOps:
                 "error": str(e)
             }
 
-    def check_cluster_status(self):
-        """check the active cluster status (health)
+    def cluster_info(self, info_type: str):
+        """Check the different type of information of active cluster
         """
         try:
-            response = self.client.get("/_cluster/health")
+            response = self.client.get(f"/_cluster/{info_type}")
 
             return response
 

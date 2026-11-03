@@ -65,12 +65,12 @@ def authentication(credentials: LoginCredentials):
         )
 
 
-@router.get("/cluster_status", status_code=status.HTTP_200_OK, description="Retrieve overall cluster health status, shard allocations, active nodes, and cluster metrics from Elasticsearch")
-def to_check_the_active_cluster_status():
-    """Return the health & details of active cluster
+@router.get("/cluster_inspect", status_code=status.HTTP_200_OK, description="Retrieve cluster health status, settings, stats, shard allocations, active nodes, and cluster metrics from Elasticsearch")
+def to_check_the_active_cluster_status(info_type: str):
+    """Return the different kind of specific informations of running elastic cluster
     """
     try:
-        response = coreops.check_cluster_status()
+        response = coreops.cluster_info(info_type=info_type)
 
         if "error" in response:
             raise HTTPException(
