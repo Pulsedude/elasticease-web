@@ -1028,6 +1028,7 @@ export default function ConsoleAppPage({ theme }) {
           argSuggestions={argSuggestions}
           activeIndex={suggestionActiveIndex}
           onSelect={applySuggestion}
+          onHighlight={setSuggestionActiveIndex}
           mode={suggestionMode}
           argHint={argHint}
         />
