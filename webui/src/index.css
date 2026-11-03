@@ -200,6 +200,8 @@ img, video, svg { max-width: 100%; display: block; }
 .app-main {
   flex: 1 1 auto;
   width: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Default content wrapper — dashboard / home */
@@ -232,6 +234,19 @@ img, video, svg { max-width: 100%; display: block; }
   max-width: 740px;
   margin-inline: auto;
   padding: 32px 24px 64px;
+}
+
+/* 404 / Error pages — vertically centered, responsive container */
+.page-content--not-found {
+  width: 100%;
+  max-width: 1280px;
+  margin-inline: auto;
+  padding: 24px 16px;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .page-stack { width: 100%; }
@@ -1406,6 +1421,7 @@ input.terminal-input {
   max-height: 280px;
   overflow-y: auto;
   padding: 4px 0;
+  scroll-behavior: auto;
 }
 
 .suggestion-arg-hint {
@@ -2624,4 +2640,53 @@ input.palette-input:focus-visible {
   gap: 12px;
   margin-bottom: 14px;
 }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   NOT FOUND (404) PAGE STYLES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.not-found-container {
+  position: relative;
+  width: 100%;
+  max-width: 680px;
+  margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  z-index: 10;
+}
+
+.not-found-grid-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(var(--border) 1px, transparent 1px);
+  background-size: 24px 24px;
+  opacity: 0.4;
+  mask-image: radial-gradient(ellipse 65% 65% at 50% 45%, black, transparent);
+  -webkit-mask-image: radial-gradient(ellipse 65% 65% at 50% 45%, black, transparent);
+}
+
+.not-found-dest-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+  min-width: 0;
+  width: 100%;
+}
+
+.not-found-dest-card:hover {
+  background: var(--bg-raised);
+  border-color: rgba(99, 102, 241, 0.45);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
 

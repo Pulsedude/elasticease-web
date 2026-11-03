@@ -39,7 +39,15 @@ export const COMMAND_REGISTRY = [
     name: "cluster:stats",
     description: "Get detailed cluster statistics",
     category: "Cluster",
-    arguments: [],
+    arguments: [
+      {
+        name: "json",
+        type: "boolean",
+        description: "Return raw JSON if true, formatted table if false (default: true)",
+        required: false,
+        options: ["true", "false"],
+      },
+    ],
   },
   {
     name: "cluster:nodes",
@@ -51,7 +59,36 @@ export const COMMAND_REGISTRY = [
     name: "cluster:settings",
     description: "Get current cluster settings",
     category: "Cluster",
-    arguments: [],
+    arguments: [
+      {
+        name: "json",
+        type: "boolean",
+        description: "Return raw JSON if true, formatted table if false (default: true)",
+        required: false,
+        options: ["true", "false"],
+      },
+    ],
+  },
+  {
+    name: "cluster:inspect",
+    description: "Inspect cluster information via /v1/core/cluster_inspect",
+    category: "Cluster",
+    arguments: [
+      {
+        name: "info_type",
+        type: "enum",
+        description: "Type of cluster info to inspect (health, stats, settings, state)",
+        required: true,
+        options: ["health", "stats", "settings", "state"],
+      },
+      {
+        name: "json",
+        type: "boolean",
+        description: "Return raw JSON if true (default: true)",
+        required: false,
+        options: ["true", "false"],
+      },
+    ],
   },
 
   // ── INDEX ─────────────────────────────────────────────────

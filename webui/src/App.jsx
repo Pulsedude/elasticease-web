@@ -37,7 +37,8 @@ function getPageContentClass(pathname) {
   if (pathname === "/console")  return "page-content--console";
   if (pathname === "/settings") return "page-content--narrow";
   if (pathname === "/cluster")  return "page-content--wide";
-  return "page-content";
+  if (pathname === "/home")     return "page-content";
+  return "page-content--not-found";
 }
 
 function AppContent() {
@@ -176,13 +177,17 @@ function AppContent() {
                   <SettingsPage theme={theme} />
                 </ProtectedRoute>
               } />
-              <Route path="*" element={<NotFoundPage />} />
+              <Route path="*" element={<NotFoundPage theme={theme} user={user} />} />
             </Routes>
           </div>
         ) : (
           <Routes>
             <Route path="/login" element={user ? <Navigate to="/home" replace /> : <LoginModal onLoginSuccess={handleLoginSuccess} />} />
-            <Route path="*" element={user ? <Navigate to="/home" replace /> : <Navigate to="/login" replace />} />
+            <Route path="/home" element={<Navigate to="/login" replace />} />
+            <Route path="/console" element={<Navigate to="/login" replace />} />
+            <Route path="/cluster" element={<Navigate to="/login" replace />} />
+            <Route path="/settings" element={<Navigate to="/login" replace />} />
+            <Route path="*" element={<NotFoundPage theme={theme} user={user} />} />
           </Routes>
         )}
       </main>

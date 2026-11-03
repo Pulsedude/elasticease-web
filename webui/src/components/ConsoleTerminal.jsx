@@ -41,6 +41,8 @@ function highlightTabular(text) {
 
 const PRESETS = [
   "cluster:health",
+  "cluster:stats",
+  "cluster:settings",
   "index:list",
   "index:count",
   "index:data",
@@ -58,20 +60,11 @@ function normalizeCommand(raw) {
   if (lower.startsWith("get /_cluster/health")) {
     return lower.includes("json") ? "cluster:health json=true" : "cluster:health";
   }
-  if (lower.startsWith("get /_cat/indices")) {
-    return lower.includes("json") ? "index:list json=true" : "index:list";
-  }
-  if (lower.startsWith("get /_cat/nodes")) {
-    return lower.includes("json") ? "cluster:nodes json=true" : "cluster:nodes";
-  }
-  if (lower.startsWith("get /_cat/shards")) {
-    return lower.includes("json") ? "shards:list json=true" : "shards:list";
-  }
-  if (lower.startsWith("get /_cat/allocation") || lower.startsWith("get /_allocation")) {
-    return lower.includes("json") ? "allocation:list json=true" : "allocation:list";
-  }
   if (lower.startsWith("get /_cluster/stats")) {
-    return "cluster:health json=true";
+    return lower.includes("json") ? "cluster:stats json=true" : "cluster:stats";
+  }
+  if (lower.startsWith("get /_cluster/settings")) {
+    return lower.includes("json") ? "cluster:settings json=true" : "cluster:settings";
   }
   const countMatch = trimmed.match(/^get\s+\/([a-zA-Z0-9_.*-]+)\/_count/i);
   if (countMatch) {

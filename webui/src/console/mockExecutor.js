@@ -185,39 +185,65 @@ function formatClusterHealthTable(data) {
   return `${header}\n${body}`;
 }
 
-async function fetchClusterHealth(parsed) {
+function formatClusterGenericTable(data, title) {
+  if (!data || typeof data !== "object") return String(data);
+  const rows = [];
+  for (const [key, val] of Object.entries(data)) {
+    const valStr = typeof val === "object" ? JSON.stringify(val) : String(val);
+    rows.push([key, valStr.length > 70 ? valStr.slice(0, 67) + "..." : valStr]);
+  }
+  const col1Width = 32;
+  const header = `${(title.toUpperCase() + " FIELD").padEnd(col1Width)} VALUE\n${"-".repeat(col1Width)} ------------------`;
+  const body = rows.map(([metric, val]) => `${metric.padEnd(col1Width)} ${val}`).join("\n");
+  return `${header}\n${body}`;
+}
+
+export async function fetchClusterInspect(parsed, infoType = "health", defaultFormat = "json") {
   const startTime = performance.now();
-  const rawArg = String(parsed.argMap.json || "").toLowerCase();
-  const isJson = rawArg === "true" || rawArg === "1";
+  const rawArg = String(parsed?.argMap?.json ?? parsed?.argTokens?.[1] ?? "").toLowerCase().trim();
+  const isExplicitJson = rawArg === "true" || rawArg === "1";
+  const isExplicitTable = rawArg === "false" || rawArg === "0";
 
   try {
-    const res = await apiFetch(`${API_BASE_URL}/v1/core/cluster_status`);
+    const res = await apiFetch(`${API_BASE_URL}/v1/core/cluster_inspect?info_type=${encodeURIComponent(infoType)}`);
     const durationMs = Math.round(performance.now() - startTime);
 
     if (!res.ok) {
       let errMsg = `API request failed with HTTP status ${res.status}`;
       try {
         const errJson = await res.json();
-        if (errJson?.detail?.error) errMsg = typeof errJson.detail.error === "string" ? errJson.detail.error : JSON.stringify(errJson.detail.error);
-        else if (errJson?.detail) errMsg = typeof errJson.detail === "string" ? errJson.detail : JSON.stringify(errJson.detail);
-        else if (errJson?.error) errMsg = typeof errJson.error === "string" ? errJson.error : JSON.stringify(errJson.error);
+        if (errJson?.detail?.error) {
+          errMsg = typeof errJson.detail.error === "string" ? errJson.detail.error : JSON.stringify(errJson.detail.error);
+        } else if (errJson?.detail) {
+          errMsg = typeof errJson.detail === "string" ? errJson.detail : JSON.stringify(errJson.detail);
+        } else if (errJson?.error) {
+          errMsg = typeof errJson.error === "string" ? errJson.error : JSON.stringify(errJson.error);
+        }
       } catch { }
       return error(errMsg, res.status, durationMs);
     }
 
     const payload = await res.json();
     if (payload && payload.success === false) {
-      const errMsg = payload.error || payload.response || "Failed to fetch cluster health";
+      const errMsg = payload.error || payload.response || `Failed to fetch cluster ${infoType}`;
       return error(typeof errMsg === "string" ? errMsg : JSON.stringify(errMsg), 400, durationMs);
     }
 
-    const clusterData = (payload && payload.success && payload.response) ? payload.response : payload;
+    const clusterData = (payload && payload.success && payload.response !== undefined) ? payload.response : payload;
 
-    if (isJson) {
-      return ok(clusterData, "json", durationMs);
-    } else {
-      return ok(formatClusterHealthTable(clusterData), "table", durationMs);
+    if (infoType === "health") {
+      if (isExplicitJson) {
+        return ok(clusterData, "json", durationMs);
+      } else {
+        return ok(formatClusterHealthTable(clusterData), "table", durationMs);
+      }
     }
+
+    if (isExplicitTable) {
+      return ok(formatClusterGenericTable(clusterData, infoType), "table", durationMs);
+    }
+
+    return ok(clusterData, defaultFormat || "json", durationMs);
   } catch (err) {
     const durationMs = Math.round(performance.now() - startTime);
     return error(
@@ -226,6 +252,10 @@ async function fetchClusterHealth(parsed) {
       durationMs
     );
   }
+}
+
+export async function fetchClusterHealth(parsed) {
+  return fetchClusterInspect(parsed, "health", "table");
 }
 
 function formatShardsTable(data) {
@@ -1946,7 +1976,23 @@ export async function executeCommand(parsed) {
   try {
     switch (name) {
       case "cluster:health":
-        return fetchClusterHealth(parsed);
+        return fetchClusterInspect(parsed, "health", "table");
+
+      case "cluster:stats":
+      case "cluster:stat":
+        return fetchClusterInspect(parsed, "stats", "json");
+
+      case "cluster:settings":
+      case "cluster:setting":
+        return fetchClusterInspect(parsed, "settings", "json");
+
+      case "cluster:state":
+        return fetchClusterInspect(parsed, "state", "json");
+
+      case "cluster:inspect": {
+        const infoType = parsed.argMap.info_type || parsed.argTokens[0] || "health";
+        return fetchClusterInspect(parsed, infoType, infoType === "health" ? "table" : "json");
+      }
 
       case "cluster:nodes":
       case "nodes:list":
@@ -2131,16 +2177,6 @@ export async function executeCommand(parsed) {
     }
 
     switch (name) {
-      case "cluster:stats":
-        return ok(MOCK_CLUSTER_STATS, "json", latency);
-
-      case "cluster:settings":
-        return ok({
-          persistent: { "cluster.routing.allocation.enable": "all" },
-          transient: {},
-          defaults: { "cluster.routing.allocation.type": "balanced" },
-        }, "json", latency);
-
       case "cluster:pending-tasks":
         return ok({ tasks: [] }, "json", latency);
 
