@@ -1,9 +1,9 @@
-import { useState, useRef, useEffect, useLayoutEffect } from "react";
+﻿import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import logo from "../assets/logo.png";
 import {
   MenuIcon, SunIcon, MoonIcon, LogOutIcon,
   ShieldIcon, ServerIcon, ActivityIcon, ChevronRightIcon,
-  SparklesIcon, CheckIcon, CpuIcon
+  SparklesIcon, CheckIcon, GithubIcon
 } from "./Icons";
 import { API_BASE_URL, apiFetch } from "../api/client.js";
 
@@ -173,6 +173,17 @@ export default function Navbar({ user, onLogout, theme, toggleTheme, onOpenDrawe
 
         {/* RIGHT: theme + profile */}
         <div className="nav-actions">
+          <a
+            href="https://github.com/Pulsedude/elasticease-web"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="View on Github"
+            aria-label="GitHub Repository"
+            className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-colors cursor-pointer bg-transparent ${isDark ? "border-[#1e2130] hover:bg-[#1e2130] text-slate-400 hover:text-slate-100" : "border-slate-200 hover:bg-slate-100 text-slate-500 hover:text-slate-900"}`}
+          >
+            <GithubIcon className="w-5 h-5" />
+          </a>
+
           <button
             onClick={toggleTheme}
             type="button"

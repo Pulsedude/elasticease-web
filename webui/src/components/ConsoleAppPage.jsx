@@ -5,6 +5,7 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
+import { useLocation } from "react-router-dom";
 
 // ── Console sub-components (stay in console/ directory) ──
 import ConsoleHistoryCmp from "../console/components/ConsoleHistory.jsx";
@@ -46,8 +47,11 @@ let nextEntryId = 1;
  * by replacing mockExecutor.js without touching this file.
  */
 export default function ConsoleAppPage({ theme }) {
+  const location = useLocation();
   // ── State ────────────────────────────────────────────────
-  const [inputValue,           setInputValue]           = useState("");
+  const [inputValue,           setInputValue]           = useState(() => {
+    return location.state?.cmd || (typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("cmd") : "") || "";
+  });
   const [historyEntries,       setHistoryEntries]       = useState([]);
   const [loadingCommand,       setLoadingCommand]       = useState(null);
   const [paletteOpen,          setPaletteOpen]          = useState(false);
@@ -59,6 +63,16 @@ export default function ConsoleAppPage({ theme }) {
   const [activeArgIndex,       setActiveArgIndex]       = useState(-1);
 
   const inputRef = useRef(null);
+
+  useEffect(() => {
+    const cmd = location.state?.cmd || (typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("cmd") : "");
+    if (cmd) {
+      setInputValue(cmd);
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
+    }
+  }, [location]);
 
   // ── Derived: parse + suggestions ────────────────────────
   const parsed = useMemo(() => parseInput(inputValue), [inputValue]);

@@ -6,9 +6,11 @@ import LoginModal from "./components/LoginModal";
 import HomePage from "./components/HomePage";
 import ConsoleAppPage from "./components/ConsoleAppPage";
 import ClusterHealthPage from "./components/ClusterHealthPage";
+import CommandsGuidePage from "./components/CommandsGuidePage";
 import SettingsPage from "./components/SettingsPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import NotFoundPage from "./components/NotFoundPage";
+import { GithubIcon } from "./components/Icons";
 import { API_BASE_URL, createEventSource } from "./api/client.js";
 
 const AUTH_USER_KEY  = "elasticease_session_user";
@@ -36,7 +38,7 @@ function readSessionUser() {
 function getPageContentClass(pathname) {
   if (pathname === "/console")  return "page-content--console";
   if (pathname === "/settings") return "page-content--narrow";
-  if (pathname === "/cluster")  return "page-content--wide";
+  if (pathname === "/cluster" || pathname === "/commands")  return "page-content--wide";
   if (pathname === "/home")     return "page-content";
   return "page-content--not-found";
 }
@@ -64,16 +66,20 @@ function AppContent() {
 
     try {
       eventSource = createEventSource(`${API_BASE_URL}/v1/core/cluster_info`);
+      eventSource.onopen = () => {
+        if (!active) return;
+        setIsBackendConnected(true);
+      };
       eventSource.onmessage = (event) => {
         if (!active) return;
         try {
           const payload = JSON.parse(event.data);
           if (payload) {
+            setIsBackendConnected(true);
             if (payload.success === false) {
-              setIsBackendConnected(false);
+              setClusterHealth(null);
               return;
             }
-            setIsBackendConnected(true);
             const clusterStats = (payload.response && typeof payload.response === "object") ? payload.response : payload;
             const status = clusterStats?.status || payload.cluster_health?.status;
             if (status) {
@@ -125,6 +131,7 @@ function AppContent() {
   let activeTab = "home";
   if (location.pathname === "/console")  activeTab = "console";
   else if (location.pathname === "/cluster")  activeTab = "cluster";
+  else if (location.pathname === "/commands") activeTab = "commands";
   else if (location.pathname === "/settings") activeTab = "settings";
 
   const contentClass = showShell ? getPageContentClass(location.pathname) : "";
@@ -149,6 +156,7 @@ function AppContent() {
             onClose={() => setDrawerOpen(false)}
             activeTab={activeTab}
             theme={theme}
+            isBackendConnected={isBackendConnected}
           />
         </>
       )}
@@ -172,6 +180,11 @@ function AppContent() {
                   <ClusterHealthPage theme={theme} />
                 </ProtectedRoute>
               } />
+              <Route path="/commands" element={
+                <ProtectedRoute user={user}>
+                  <CommandsGuidePage theme={theme} />
+                </ProtectedRoute>
+              } />
               <Route path="/settings" element={
                 <ProtectedRoute user={user}>
                   <SettingsPage theme={theme} />
@@ -186,6 +199,7 @@ function AppContent() {
             <Route path="/home" element={<Navigate to="/login" replace />} />
             <Route path="/console" element={<Navigate to="/login" replace />} />
             <Route path="/cluster" element={<Navigate to="/login" replace />} />
+            <Route path="/commands" element={<Navigate to="/login" replace />} />
             <Route path="/settings" element={<Navigate to="/login" replace />} />
             <Route path="*" element={<NotFoundPage theme={theme} user={user} />} />
           </Routes>
@@ -200,10 +214,26 @@ function AppContent() {
             <span className={isDark ? "text-slate-700" : "text-slate-300"}>·</span>
             <span className={`text-xs ${isDark ? "text-slate-600" : "text-slate-400"}`}>v0.1.0</span>
           </div>
-          <span className={`text-[11px] flex items-center gap-1.5 ${isDark ? "text-slate-700" : "text-slate-400"}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${isBackendConnected ? "bg-emerald-500" : "bg-rose-500"}`} />
-            {isBackendConnected ? "Connected" : "Backend Offline"}
-          </span>
+          <div className="flex items-center gap-4">
+            <a
+              href="https://github.com/Pulsedude/elasticease-web"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="GitHub Repository"
+              aria-label="GitHub Repository"
+              className={`w-7 h-7 flex items-center justify-center rounded-lg border transition-colors cursor-pointer bg-transparent ${
+                isDark
+                  ? "border-[#1e2130] hover:bg-[#1e2130] text-slate-400 hover:text-slate-100"
+                  : "border-slate-200 hover:bg-slate-100 text-slate-500 hover:text-slate-900"
+              }`}
+            >
+              <GithubIcon className="w-4 h-4" />
+            </a>
+            <span className={`text-[11px] flex items-center gap-1.5 ${isDark ? "text-slate-600" : "text-slate-400"}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${isBackendConnected ? "bg-emerald-500" : "bg-rose-500"}`} />
+              {isBackendConnected ? "Connected" : "Backend Offline"}
+            </span>
+          </div>
         </footer>
       )}
     </div>

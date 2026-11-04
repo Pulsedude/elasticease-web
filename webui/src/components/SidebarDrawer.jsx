@@ -1,10 +1,10 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  XIcon, HomeIcon, TerminalIcon, ActivityIcon, SettingsIcon, ShieldIcon, ServerIcon,
+  XIcon, HomeIcon, TerminalIcon, ActivityIcon, SettingsIcon, ShieldIcon, ServerIcon, BookOpenIcon, GithubIcon,
 } from "./Icons";
 
-export default function SidebarDrawer({ isOpen, onClose, activeTab, theme }) {
+export default function SidebarDrawer({ isOpen, onClose, activeTab, theme, isBackendConnected = false }) {
   const isDark = theme === "dark";
   const navigate = useNavigate();
 
@@ -23,6 +23,7 @@ export default function SidebarDrawer({ isOpen, onClose, activeTab, theme }) {
     { id: "home",     path: "/home",     label: "Overview",            icon: HomeIcon,     desc: "Dashboard & metrics" },
     { id: "console",  path: "/console",  label: "Console",             icon: TerminalIcon, desc: "CLI terminal & commands" },
     { id: "cluster",  path: "/cluster",  label: "Cluster Diagnostics", icon: ActivityIcon, desc: "Nodes, shards & indices" },
+    { id: "commands", path: "/commands", label: "Commands Guide",      icon: BookOpenIcon, desc: "CLI syntax, args & usage" },
     { id: "settings", path: "/settings", label: "Settings",            icon: SettingsIcon, desc: "Configure endpoints" },
   ];
 
@@ -70,20 +71,36 @@ export default function SidebarDrawer({ isOpen, onClose, activeTab, theme }) {
                 onClick={() => { navigate(item.path); onClose(); }}
                 type="button"
                 aria-current={active ? "page" : undefined}
-                className={`drawer-nav-item ${
+                className={`drawer-nav-item ${active ? "active is-active" : ""} ${
                   active
                     ? isDark ? "bg-indigo-500/10 border-indigo-500/30" : "bg-indigo-50 border-indigo-200"
                     : "hover:bg-raised"
                 }`}
+                style={
+                  active
+                    ? isDark
+                      ? { backgroundColor: "rgba(99, 102, 241, 0.12)", borderColor: "rgba(99, 102, 241, 0.3)" }
+                      : { backgroundColor: "#eef2ff", borderColor: "#c7d2fe" }
+                    : undefined
+                }
               >
-                <div className={`drawer-nav-icon ${
-                  active ? "bg-indigo-600" : "bg-raised"
-                }`}>
-                  <Icon className={`w-4 h-4 ${active ? "text-white" : "text-muted"}`} />
+                <div
+                  className={`drawer-nav-icon ${
+                    active ? "active is-active bg-indigo-600 text-white" : "bg-raised"
+                  }`}
+                  style={active ? { backgroundColor: "#4f46e5", color: "#ffffff" } : undefined}
+                >
+                  <Icon
+                    className={`w-4 h-4 ${active ? "text-white" : "text-muted"}`}
+                    style={active ? { color: "#ffffff", stroke: "#ffffff" } : undefined}
+                  />
                 </div>
                 <div className="drawer-nav-copy">
                   <div className="drawer-nav-title-row">
-                    <span className={active ? isDark ? "text-indigo-300" : "text-indigo-700" : "text-primary"}>
+                    <span
+                      className={active ? (isDark ? "text-indigo-300" : "text-indigo-700") : "text-primary"}
+                      style={active ? (isDark ? { color: "#a5b4fc" } : { color: "#4338ca" }) : undefined}
+                    >
                       {item.label}
                     </span>
                   </div>
@@ -95,16 +112,33 @@ export default function SidebarDrawer({ isOpen, onClose, activeTab, theme }) {
         </div>
 
         {/* Footer */}
-        <div className="drawer-footer border-t border-base">
+        <div className="drawer-footer border-t border-base flex flex-col gap-3">
           <div className="drawer-status-card bg-surface border border-base rounded-lg p-3">
             <div className="drawer-status-row flex justify-between items-center mb-1">
               <span className="text-xs font-semibold flex items-center gap-1.5 text-primary">
-                <ServerIcon className="w-3.5 h-3.5 text-emerald-500" /> Backend
+                <ServerIcon className={`w-3.5 h-3.5 ${isBackendConnected ? "text-emerald-500" : "text-rose-500"}`} /> Backend
               </span>
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className={`w-2 h-2 rounded-full ${isBackendConnected ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`} />
             </div>
-            <p className="text-[11px] text-secondary">API connected</p>
+            <p className="text-[11px] text-secondary">
+              {isBackendConnected ? "API connected" : "API offline"}
+            </p>
           </div>
+
+          <a
+            href="https://github.com/Pulsedude/elasticease-web"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="GitHub Repository"
+            aria-label="GitHub Repository"
+            className="flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium border border-base bg-surface text-secondary hover:text-primary hover:border-indigo-500/40 transition-colors cursor-pointer"
+          >
+            <span className="flex items-center gap-2">
+              <GithubIcon className="w-4 h-4 text-primary" />
+              <span>View on GitHub</span>
+            </span>
+            <span className="text-[10px] text-muted font-mono">v0.1.0</span>
+          </a>
         </div>
       </div>
     </div>
