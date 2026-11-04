@@ -148,7 +148,9 @@ export function createEventSource(url, options = {}) {
 
       while (!isClosed) {
         const { value, done } = await reader.read();
-        if (done) break;
+        if (done) {
+          throw new Error("SSE connection closed by server");
+        }
 
         buffer += decoder.decode(value, { stream: true });
         const parts = buffer.split(/\r?\n\r?\n/);
@@ -201,6 +203,7 @@ export function createEventSource(url, options = {}) {
       }
     } catch (err) {
       if (isClosed) return;
+      instance.readyState = 0;
       let errEvt;
       try {
         errEvt = new Event("error");
