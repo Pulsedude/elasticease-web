@@ -1,7 +1,8 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import logo from "../assets/logo.png";
 import {
-  XIcon, HomeIcon, TerminalIcon, ActivityIcon, SettingsIcon, ShieldIcon, ServerIcon, BookOpenIcon, GithubIcon,
+  XIcon, HomeIcon, TerminalIcon, ActivityIcon, SettingsIcon, ServerIcon, BookOpenIcon, GithubIcon,
 } from "./Icons";
 
 export default function SidebarDrawer({ isOpen, onClose, activeTab, theme, isBackendConnected = false }) {
@@ -40,9 +41,9 @@ export default function SidebarDrawer({ isOpen, onClose, activeTab, theme, isBac
         {/* Header */}
         <div className="drawer-header border-b border-base">
           <div className="drawer-brand">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{ boxShadow: "0 0 0 1px rgba(99,102,241,0.3)", background: "rgba(99,102,241,0.1)" }}>
-              <ShieldIcon className="w-4 h-4 text-indigo-400" />
+            <div className="w-7 h-7 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0"
+              style={{ boxShadow: "0 0 0 1px rgba(99,102,241,0.3)" }}>
+              <img src={logo} alt="Elasticease Logo" className="w-full h-full object-cover" />
             </div>
             <div>
               <p className="gradient-text font-bold text-[14px] leading-none">elasticease</p>

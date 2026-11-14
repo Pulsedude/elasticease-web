@@ -11,15 +11,10 @@ import React from "react";
 
 const QUICK_COMMANDS = [
   { label: "cluster:health", command: "cluster:health" },
+  { label: "cluster:stats",  command: "cluster:stats"  },
+  { label: "cluster:nodes",  command: "cluster:nodes"  },
+  { label: "cluster:settings",command: "cluster:settings"},
   { label: "index:list",     command: "index:list"     },
-  { label: "index:get",      command: "index:get "     },
-  { label: "index:count",    command: "index:count "   },
-  { label: "index:data",     command: "index:data "    },
-  { label: "document:get",   command: "document:get "  },
-  { label: "document:insert",command: "document:insert "},
-  { label: "bulk:insert",    command: "bulk:insert "   },
-  { label: "bulk:update",    command: "bulk:update "   },
-  { label: "bulk:delete",    command: "bulk:delete "   },
   { label: "node:stats",     command: "node:stats"     },
   { label: "node:jvm",       command: "node:jvm"       },
   { label: "node:os",        command: "node:os"        },

@@ -331,7 +331,7 @@ export default function HomePage({ onNavigateToTab, theme }) {
               <code className={`font-mono text-xs px-1.5 py-0.5 rounded ${isDark ? "bg-[#1e2130] text-rose-300" : "bg-rose-100 text-rose-900"}`}>
                 {API_BASE_URL}
               </code>
-              . Telemetry and cluster metrics are unavailable. Please ensure your Python backend service (<code>run.py</code>) is running.
+              . Telemetry and cluster metrics are unavailable. Please ensure your backend service is running.
             </div>
           </div>
         </div>

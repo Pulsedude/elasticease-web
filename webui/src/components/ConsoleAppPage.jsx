@@ -15,7 +15,7 @@ import CommandPalette from "../console/components/CommandPalette.jsx";
 import QuickCommands from "../console/components/QuickCommands.jsx";
 
 // ── Logic modules ──
-import { parseInput, hasTrailingSpace, currentArgIndex } from "../console/commandParser.js";
+import { parseInput, currentArgIndex } from "../console/commandParser.js";
 import { validateCommand } from "../console/commandValidator.js";
 import { getCommandSuggestions, getArgumentSuggestions } from "../console/suggestionEngine.js";
 import { createHistoryManager } from "../console/historyManager.js";
@@ -38,6 +38,21 @@ import {
 const historyManager = createHistoryManager();
 let nextEntryId = 1;
 
+function normalizeIncomingCmd(cmdStr) {
+  if (!cmdStr || typeof cmdStr !== "string") return "";
+  const parsed = parseInput(cmdStr);
+  if (parsed.definition && parsed.argTokens.length > 0) {
+    const formattedTokens = parsed.argTokens.map((t) => {
+      const str = String(t ?? "");
+      if (str === "") return '""';
+      if (str.includes(" ") && !str.startsWith('"')) return `"${str}"`;
+      return str;
+    });
+    return `${parsed.commandName} ${formattedTokens.join(" ")}`;
+  }
+  return cmdStr;
+}
+
 /**
  * ConsoleAppPage — the full command-driven Elasticease console.
  *
@@ -50,7 +65,8 @@ export default function ConsoleAppPage({ theme }) {
   const location = useLocation();
   // ── State ────────────────────────────────────────────────
   const [inputValue,           setInputValue]           = useState(() => {
-    return location.state?.cmd || (typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("cmd") : "") || "";
+    const rawCmd = location.state?.cmd || (typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("cmd") : "") || "";
+    return normalizeIncomingCmd(rawCmd);
   });
   const [historyEntries,       setHistoryEntries]       = useState([]);
   const [loadingCommand,       setLoadingCommand]       = useState(null);
@@ -65,9 +81,9 @@ export default function ConsoleAppPage({ theme }) {
   const inputRef = useRef(null);
 
   useEffect(() => {
-    const cmd = location.state?.cmd || (typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("cmd") : "");
-    if (cmd) {
-      setInputValue(cmd);
+    const rawCmd = location.state?.cmd || (typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("cmd") : "");
+    if (rawCmd) {
+      setInputValue(normalizeIncomingCmd(rawCmd));
       if (inputRef.current) {
         inputRef.current.focus();
       }
@@ -979,7 +995,7 @@ export default function ConsoleAppPage({ theme }) {
   }, [suggestionActiveIndex, suggestionMode, commandSuggestions, argSuggestions, applySuggestion]);
 
   const handleQuickInsert = useCallback((cmd) => {
-    setInputValue(cmd + " ");
+    setInputValue(cmd.trim());
     setActiveArgIndex(0);
     setShowSuggestions(true);
     setSuggestionActiveIndex(-1);

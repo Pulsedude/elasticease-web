@@ -15,6 +15,41 @@ import {
 import BackButton from "./BackButton";
 import { COMMAND_REGISTRY, getCategories } from "../console/commandRegistry.js";
 
+// Helper to get an appropriate example value for an argument
+function getArgExampleValue(arg) {
+  if (
+    arg.type === "boolean" ||
+    (arg.options && arg.options.includes("false") && arg.options.includes("true"))
+  ) {
+    return "false";
+  }
+  if (arg.options && arg.options.length > 0) {
+    return arg.options[0];
+  }
+  if (arg.type === "index" || arg.name === "index") {
+    return "my_index";
+  }
+  if (arg.name === "index_name") {
+    return "new_index";
+  }
+  if (arg.type === "file" || arg.name === "file") {
+    return "documents.json";
+  }
+  if (arg.name === "id") {
+    return "doc_101";
+  }
+  if (arg.type === "node" || arg.name === "node") {
+    return "node-1";
+  }
+  if (arg.type === "number" || arg.name === "size") {
+    return "100";
+  }
+  if (arg.name === "metric") {
+    return "jvm";
+  }
+  return arg.name;
+}
+
 // Helper to generate canonical syntax string
 function getCommandSyntax(cmd) {
   const reqArgs = (cmd.arguments || [])
@@ -25,9 +60,9 @@ function getCommandSyntax(cmd) {
     .filter((a) => !a.required)
     .map((a) => {
       if (a.options && a.options.length > 0 && a.options.length <= 3) {
-        return `[--${a.name}=${a.options.join("|")}]`;
+        return `[${a.name}=${a.options.join("|")}]`;
       }
-      return `[--${a.name}=<${a.type}>]`;
+      return `[${a.name}]`;
     });
 
   return [cmd.name, ...reqArgs, ...optArgs].join(" ");
@@ -36,30 +71,9 @@ function getCommandSyntax(cmd) {
 // Helper to generate an executable example command
 function getCommandExample(cmd) {
   const parts = [cmd.name];
-  const required = (cmd.arguments || []).filter((a) => a.required);
-
-  for (const arg of required) {
-    if (arg.options && arg.options.length > 0) {
-      parts.push(arg.options[0]);
-    } else if (arg.type === "index") {
-      parts.push("my_index");
-    } else if (arg.type === "file") {
-      parts.push("documents.json");
-    } else if (arg.name === "id") {
-      parts.push("doc_101");
-    } else if (arg.name === "index_name") {
-      parts.push("new_index");
-    } else {
-      parts.push(arg.name);
-    }
+  for (const arg of (cmd.arguments || [])) {
+    parts.push(getArgExampleValue(arg));
   }
-
-  // Include one popular flag if present and not required
-  const jsonArg = (cmd.arguments || []).find((a) => a.name === "json" && !a.required);
-  if (jsonArg && parts.length === 1) {
-    parts.push("--json=false");
-  }
-
   return parts.join(" ");
 }
 
@@ -538,7 +552,7 @@ export default function CommandsGuidePage({ theme }) {
                               <div className="space-y-1 flex-1">
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <span className="font-mono text-xs font-semibold text-primary">
-                                    --{arg.name}
+                                    [{arg.name}]
                                   </span>
                                   <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase font-mono bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
                                     {arg.type}

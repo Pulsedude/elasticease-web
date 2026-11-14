@@ -44,10 +44,8 @@ const PRESETS = [
   "cluster:stats",
   "cluster:settings",
   "index:list",
-  "index:count",
-  "index:data",
-  "bulk:insert",
   "cluster:nodes",
+  "node:stats",
   "node:settings",
   "node:os",
   "shards:list",
@@ -106,7 +104,6 @@ export default function ConsoleTerminal() {
     },
   ]);
   const [isRunning, setIsRunning] = useState(false);
-  const bottomRef = useRef(null);
   const inputRef  = useRef(null);
 
   // Execute initial cluster:health on load to display live data from backend API
@@ -240,8 +237,13 @@ export default function ConsoleTerminal() {
     }
   };
 
+  const outputRef = useRef(null);
+
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Scroll only the terminal output container, not the whole page
+    if (outputRef.current) {
+      outputRef.current.scrollTop = outputRef.current.scrollHeight;
+    }
   }, [history, isRunning]);
 
   return (
@@ -288,6 +290,7 @@ export default function ConsoleTerminal() {
       {/* Output */}
       <div
         className="terminal-output"
+        ref={outputRef}
         onClick={() => inputRef.current?.focus()}
         role="log"
         aria-live="polite"
@@ -326,7 +329,6 @@ export default function ConsoleTerminal() {
             </div>
           </div>
         )}
-        <div ref={bottomRef} />
       </div>
 
       {/* Input */}

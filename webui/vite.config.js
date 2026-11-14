@@ -11,10 +11,31 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, '..');
 
-// Read config.yaml from project root (one level up from webui)
-const configPath = path.resolve(projectRoot, 'config.yaml');
-const fileContents = fs.readFileSync(configPath, "utf8");
-const config = yaml.parse(fileContents);
+// Read config.yaml safely from candidate locations
+function loadConfig() {
+  const candidatePaths = [
+    path.resolve(projectRoot, 'config.yaml'),
+    path.resolve(projectRoot, 'config.yml'),
+    path.resolve(__dirname, 'config.yaml'),
+    path.resolve(__dirname, 'config.yml'),
+    path.resolve(projectRoot, 'example.config.yml')
+  ];
+
+  for (const candidate of candidatePaths) {
+    try {
+      if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+        const fileContents = fs.readFileSync(candidate, 'utf8');
+        const parsed = yaml.parse(fileContents);
+        if (parsed && typeof parsed === 'object') {
+          return parsed;
+        }
+      }
+    } catch {}
+  }
+  return {};
+}
+
+const config = loadConfig();
 const frontendBootId = `${Date.now()}`;
 
 function resolveApiKey(mode = 'development') {
@@ -68,8 +89,8 @@ export default defineConfig(({ mode }) => {
     envDir: projectRoot,
     plugins: [react(), tailwindcss()],
     server: {
-      host: config.elasticease_web.frontend.host,
-      port: config.elasticease_web.frontend.port
+      host: config.elasticease_web?.frontend?.host || '0.0.0.0',
+      port: config.elasticease_web?.frontend?.port || 5173
     },
     define: {
       // Expose backend config to frontend

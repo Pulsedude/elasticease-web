@@ -73,12 +73,26 @@ const CommandInput = forwardRef(function CommandInput(
   const handleArgInputChange = (index, newVal) => {
     if (!parsed?.commandName) return;
 
+    let cleanVal = newVal;
+    const argDef = argDefs[index];
+    if (argDef && typeof cleanVal === "string") {
+      if (cleanVal.startsWith(`--${argDef.name}=`)) {
+        cleanVal = cleanVal.slice(`--${argDef.name}=`.length);
+      } else if (cleanVal.startsWith(`-${argDef.name}=`)) {
+        cleanVal = cleanVal.slice(`-${argDef.name}=`.length);
+      } else if (cleanVal.startsWith(`${argDef.name}=`)) {
+        cleanVal = cleanVal.slice(`${argDef.name}=`.length);
+      } else if (cleanVal.startsWith("--")) {
+        cleanVal = cleanVal.replace(/^--?/, "");
+      }
+    }
+
     const maxLen = Math.max(argDefs.length, (parsed?.argTokens || []).length, index + 1);
     const tokens = [];
     for (let i = 0; i < maxLen; i++) {
       tokens.push(parsed?.argTokens?.[i] ?? "");
     }
-    tokens[index] = newVal;
+    tokens[index] = cleanVal;
 
     let lastNonEmptyIdx = -1;
     for (let i = tokens.length - 1; i >= 0; i--) {
@@ -244,7 +258,21 @@ const CommandInput = forwardRef(function CommandInput(
             {argDefs.length > 0 ? (
               <div className="flex items-center gap-[8px] flex-1 min-w-0">
                 {argDefs.map((argDef, i) => {
-                  const val = parsed?.argTokens?.[i] ?? "";
+                  let val = parsed?.argTokens?.[i] ?? "";
+                  if (typeof val === "string") {
+                    if (val.startsWith(`--${argDef.name}=`)) {
+                      val = val.slice(`--${argDef.name}=`.length);
+                    } else if (val.startsWith(`-${argDef.name}=`)) {
+                      val = val.slice(`-${argDef.name}=`.length);
+                    } else if (val.startsWith(`${argDef.name}=`)) {
+                      val = val.slice(`${argDef.name}=`.length);
+                    } else if (val.startsWith("--")) {
+                      val = val.replace(/^--?/, "");
+                    }
+                  }
+                  if (!val && parsed?.argMap?.[argDef.name] !== undefined) {
+                    val = String(parsed.argMap[argDef.name]);
+                  }
                   const isFocused = focusedArgIndex === i;
                   const isMissing = validationError && argDef.required && !val.trim();
 

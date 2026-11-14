@@ -116,14 +116,7 @@ export default function SettingsPage({ theme }) {
           Connection Settings
         </h1>
         <p>
-          Configure how the frontend communicates with your backend 
-          <code
-            className={`text-xs px-1.5 py-0.5 rounded font-mono ${
-              isDark ? "bg-[#1e2130] text-indigo-300" : "bg-slate-100 text-indigo-700"
-            }`}
-          >
-          </code>
-          and Elasticsearch cluster. Changes are saved directly to{" "}
+          Configure how the frontend communicates with your backend and Elasticsearch cluster. Changes are saved directly to{" "}
           <code
             className={`text-xs px-1.5 py-0.5 rounded font-mono ${
               isDark ? "bg-[#1e2130] text-indigo-300" : "bg-slate-100 text-indigo-700"
@@ -183,7 +176,9 @@ export default function SettingsPage({ theme }) {
                   isDark ? "bg-[#1e2130] text-indigo-300" : "bg-slate-100 text-indigo-700"
                 }`}
               >
+                config.yaml
               </code>
+              .
             </p>
           </div>
 
@@ -205,7 +200,9 @@ export default function SettingsPage({ theme }) {
                   isDark ? "bg-[#1e2130] text-indigo-300" : "bg-slate-100 text-indigo-700"
                 }`}
               >
+                config.yaml
               </code>
+              .
             </p>
           </div>
 
