@@ -1,0 +1,49 @@
+name: elasticease
+
+services:
+  frontend:
+    container_name: elasticease_webui
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile.frontend
+    image: raunaksharma/elasticease-webui:latest
+
+    env_file:
+      - .env
+
+    environment:
+      BACKEND_API_KEY: secure-backend-api-key
+
+    volumes:
+      - ./config.yaml:/elasticease/config.yaml
+
+    depends_on:
+      - backend
+    
+    network_mode: host
+
+  backend:
+    container_name: elasticease_backend
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile.backend
+    image: raunaksharma/elasticease-api:latest
+
+    env_file:
+      - .env
+
+    environment:
+      BACKEND_API_KEY: secure-backend-api-key
+
+    volumes:
+      - ./config.yaml:/elasticease/config.yaml
+
+    depends_on:
+      - elastic
+    
+    network_mode: host
+  
+  elastic:
+    container_name: elastic
+    image: docker.elastic.co/elasticsearch/elasticsearch-wolfi:9.5.6
+    network_mode: host

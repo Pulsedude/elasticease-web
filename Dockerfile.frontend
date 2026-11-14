@@ -1,0 +1,14 @@
+# ------------- Frontend Image ---------------
+FROM alpine:latest
+
+RUN apk update && \
+    apk add nodejs npm
+
+WORKDIR /elasticease/webui
+
+COPY ./webui/package*.json ./
+RUN npm i
+
+COPY ./webui .
+
+CMD ["npm", "run", "dev"]

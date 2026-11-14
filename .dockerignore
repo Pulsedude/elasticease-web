@@ -1,0 +1,15 @@
+**/.git
+**/.github
+**/.vscode
+**/.idea
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.pytest_cache
+**/.venv
+**/venv
+**/node_modules
+**/webui/node_modules
+**/webui/dist
+**/log/*.log
