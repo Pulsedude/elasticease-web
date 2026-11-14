@@ -7,6 +7,7 @@ import time
 import psutil
 from pathlib import Path
 from security import verify_api_key
+import uvicorn
 
 # routers
 from routers import core_operations_routers
@@ -17,14 +18,14 @@ app = FastAPI(
     version="0.1.0",
     docs_url="/docs",
     redoc_url="/redoc",
-    openapi_url="/openapi",
-    dependencies=[Depends(verify_api_key)]
+    openapi_url="/openapi"
 )
 
 # logger
 parent_directory = Path(__file__).resolve().parent.parent
+(parent_directory / "log").mkdir(parents=True, exist_ok=True)
 
-logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s', filemode='a', filename=f"./{parent_directory}/log/api.log")
+logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s', filemode='a', filename=str(parent_directory / "log" / "api.log"))
 logger = logging.getLogger(__name__)
 
 # read configuration 
@@ -64,10 +65,16 @@ app.add_middleware(
 # default GET route 
 @app.get("/")
 def redirection_to_openapi_documentation():
-    return RedirectResponse(url="/openapi")
+    return RedirectResponse(url="/docs")
 
 # core operation routers (endpoints) ---------------------
-app.include_router(core_operations_routers.router)
+app.include_router(core_operations_routers.router, dependencies=[Depends(verify_api_key)])
 
 # crud operation routers (endpoints) ---------------------
-app.include_router(crud_operations_routers.router)
+app.include_router(crud_operations_routers.router, dependencies=[Depends(verify_api_key)])
+
+if __name__ == "__main__":
+    host = configuration.get("elasticease_web").get("backend").get("host")
+    port = configuration.get("elasticease_web").get("backend").get("port")
+    app_dir = str(Path(__file__).resolve().parent)
+    uvicorn.run("main:app", host=host, port=port, reload=True, app_dir=app_dir)

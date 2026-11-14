@@ -53,7 +53,7 @@ Starting [bold]Elasticease web[/bold]...
             sys.executable,
             "-m",
             "uvicorn",
-            "api:app",
+            "main:app",
             "--reload",
             "--host",
             backend_sev_host,

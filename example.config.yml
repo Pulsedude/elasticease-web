@@ -1,0 +1,29 @@
+elasticease_web:
+    ai_mode: true
+    selected_ai_inference: litellm
+    
+    backend:
+        allow_origins:
+        - http://localhost:5173
+        - http://127.0.0.1:5173
+        base_url: http://localhost:8000
+        host: 0.0.0.0
+        port: 8000
+
+    elasticsearch:
+        base_url: https://localhost:9200
+        username: elastic
+        password: 
+        verify_certs: false
+
+    frontend:
+        host: 0.0.0.0
+        port: 5173
+
+    model_providers:
+        litellm:
+            api_key: 
+            model: gemini/gemini-3-flash-preview
+        ollama:
+            base_url: http://0.0.0.0:11434
+            model: gpt-oss:120b-cloud

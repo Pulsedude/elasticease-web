@@ -10,6 +10,7 @@ import CommandsGuidePage from "./components/CommandsGuidePage";
 import SettingsPage from "./components/SettingsPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import NotFoundPage from "./components/NotFoundPage";
+import UnauthorizedPage from "./components/UnauthorizedPage";
 import { GithubIcon } from "./components/Icons";
 import { API_BASE_URL, createEventSource } from "./api/client.js";
 
@@ -114,7 +115,7 @@ function AppContent() {
     setUser(userData);
     sessionStorage.setItem(AUTH_BOOT_KEY, FRONTEND_BOOT_ID);
     sessionStorage.setItem(AUTH_USER_KEY, JSON.stringify(userData));
-    navigate("/home");
+    navigate("/home", { replace: true });
   };
 
   const handleLogout = () => {
@@ -195,12 +196,13 @@ function AppContent() {
           </div>
         ) : (
           <Routes>
+            <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="/login" element={user ? <Navigate to="/home" replace /> : <LoginModal onLoginSuccess={handleLoginSuccess} />} />
-            <Route path="/home" element={<Navigate to="/login" replace />} />
-            <Route path="/console" element={<Navigate to="/login" replace />} />
-            <Route path="/cluster" element={<Navigate to="/login" replace />} />
-            <Route path="/commands" element={<Navigate to="/login" replace />} />
-            <Route path="/settings" element={<Navigate to="/login" replace />} />
+            <Route path="/home" element={<UnauthorizedPage />} />
+            <Route path="/console" element={<UnauthorizedPage />} />
+            <Route path="/cluster" element={<UnauthorizedPage />} />
+            <Route path="/commands" element={<UnauthorizedPage />} />
+            <Route path="/settings" element={<UnauthorizedPage />} />
             <Route path="*" element={<NotFoundPage theme={theme} user={user} />} />
           </Routes>
         )}

@@ -74,27 +74,34 @@ export function parseInput(raw) {
   }
 
   const commandName = tokens[0].toLowerCase();
-  const argTokens = tokens.slice(1);
+  const rawArgTokens = tokens.slice(1);
   const definition = getCommand(commandName) || null;
 
   // Build named arg map from positional tokens + definition
   const argMap = {};
+  const normalizedArgTokens = [...rawArgTokens];
+
   if (definition) {
     const positionalTokens = [];
     const definedNames = new Set(definition.arguments.map(a => a.name.toLowerCase()));
 
-    for (const token of argTokens) {
+    for (let i = 0; i < rawArgTokens.length; i++) {
+      const token = rawArgTokens[i];
       const eqIdx = token.indexOf("=");
       if (eqIdx > 0) {
-        const potentialKey = token.slice(0, eqIdx).toLowerCase();
+        const rawKey = token.slice(0, eqIdx).toLowerCase();
+        const potentialKey = rawKey.replace(/^--?/, "");
         const potentialVal = token.slice(eqIdx + 1);
         if (definedNames.has(potentialKey)) {
           const matchedDef = definition.arguments.find(a => a.name.toLowerCase() === potentialKey);
           argMap[matchedDef.name] = potentialVal;
+          normalizedArgTokens[i] = potentialVal;
           continue;
         }
+      } else if (token.startsWith("--")) {
+        normalizedArgTokens[i] = token.replace(/^--?/, "");
       }
-      positionalTokens.push(token);
+      positionalTokens.push(normalizedArgTokens[i]);
     }
 
     let posIdx = 0;
@@ -109,7 +116,7 @@ export function parseInput(raw) {
   return {
     raw,
     commandName,
-    argTokens,
+    argTokens: normalizedArgTokens,
     argMap,
     definition,
     isComplete: Boolean(definition),
